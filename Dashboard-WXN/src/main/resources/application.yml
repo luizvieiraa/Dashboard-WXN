@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: whatsapp-chatbot-api
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/chatbot_db}
+    username: ${DATABASE_USERNAME:chatbot}
+    password: ${DATABASE_PASSWORD:chatbot}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # O schema e controlado pelo Flyway. O Hibernate apenas valida
+      # se as entidades batem com o schema real do banco.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: ${JPA_SHOW_SQL:false}
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# Configuracoes proprias da integracao com o WhatsApp.
+# Ver docs/API.md e o README (secao "Integracao real com WhatsApp") para detalhes
+# sobre como essas variaveis serao usadas quando a integracao real for configurada.
+# PENDENTE DE DEFINICAO COM O CLIENTE: provedor final (Meta Cloud API, Twilio, etc.).
+whatsapp:
+  enabled: ${WHATSAPP_ENABLED:false}
+  api-url: ${WHATSAPP_API_URL:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    root: INFO
+    com.chatbot.whatsapp: ${APP_LOG_LEVEL:INFO}
