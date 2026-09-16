@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:chatbot_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: sa
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+whatsapp:
+  enabled: false
+  api-url: ""
+  access-token: ""
+  phone-number-id: ""
+  webhook-verify-token: ""
+
+logging:
+  level:
+    root: WARN
+    com.chatbot.whatsapp: INFO

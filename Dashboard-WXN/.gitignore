@@ -1,0 +1,45 @@
+# ==== Java / Maven ====
+target/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+
+# ==== Variaveis de ambiente / segredos ====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ==== IDEs ====
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+bin/
+out/
+
+# ==== Sistema operacional ====
+.DS_Store
+Thumbs.db
+
+# ==== Logs ====
+*.log
+logs/
+
+# ==== Docker ====
+docker-data/
+postgres-data/
+
+# ==== Testes / cobertura ====
+/coverage/
+*.exec
