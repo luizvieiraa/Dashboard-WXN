@@ -7,7 +7,7 @@ WORKDIR /build
 # O cache do Maven persiste entre builds, mesmo quando o codigo muda.
 COPY pom.xml .
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2/repository \
+RUN --mount=type=cache,id=maven-repository,target=/root/.m2/repository \
     mvn -B package -DskipTests
 
 # ---- Etapa 2: imagem final de execucao ----
