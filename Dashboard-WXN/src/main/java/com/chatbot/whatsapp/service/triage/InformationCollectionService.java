@@ -67,7 +67,7 @@ public class InformationCollectionService {
         String value = normalizeShortField(message);
         if (value.length() > MAX_SHORT_FIELD_LENGTH) {
             return Optional.of(new TriageCollectionResult(
-                    "Essa informação ficou muito longa. Responda com até 255 caracteres, por favor.",
+                    "Quase lá! Essa resposta ficou um pouco longa. Pode resumi-la em até 255 caracteres, por favor?",
                     "TRIAGE_INVALID_" + currentField.get().name()
             ));
         }
@@ -85,7 +85,8 @@ public class InformationCollectionService {
         triageRepository.save(triage);
         conversationService.changeStatus(conversation, ConversationStatus.QUALIFIED);
         return Optional.of(new TriageCollectionResult(
-                "Obrigado! Registrei suas informações e concluímos a triagem inicial.",
+                "Tudo certo, " + firstName(customer.getName()) + "! ✨ Registrei suas informações e concluí a triagem inicial. "
+                        + "A equipe da WXN já terá esse contexto para continuar o atendimento.",
                 "TRIAGE_COMPLETED"
         ));
     }
@@ -135,18 +136,28 @@ public class InformationCollectionService {
     private TriageCollectionResult questionFor(TriageField field, Customer customer) {
         return switch (field) {
             case CUSTOMER_NAME -> new TriageCollectionResult(
-                    "Para começar, qual é o seu nome?",
+                    "Olá! Que bom ter você por aqui 😊 Vou fazer algumas perguntas rápidas para entender como a WXN pode ajudar. "
+                            + "Para começar, como posso te chamar?",
                     "TRIAGE_AWAITING_CUSTOMER_NAME"
             );
             case COMPANY_NAME -> new TriageCollectionResult(
-                    "Obrigado, " + customer.getName() + ". Qual é o nome da sua empresa?",
+                    "Prazer, " + firstName(customer.getName()) + "! Em qual empresa você trabalha? "
+                            + "Se estiver falando por conta própria, pode responder “particular”.",
                     "TRIAGE_AWAITING_COMPANY_NAME"
             );
             case SUBJECT -> new TriageCollectionResult(
-                    "Certo. Qual assunto ou informação você procura?",
+                    "Perfeito, " + firstName(customer.getName()) + "! Agora me conte um pouco mais: "
+                            + "qual assunto você gostaria de resolver ou entender melhor?",
                     "TRIAGE_AWAITING_SUBJECT"
             );
         };
+    }
+
+    private String firstName(String fullName) {
+        if (isBlank(fullName)) {
+            return "por aqui";
+        }
+        return fullName.trim().split("\\s+", 2)[0];
     }
 
     private String buildSummary(Customer customer, Triage triage) {

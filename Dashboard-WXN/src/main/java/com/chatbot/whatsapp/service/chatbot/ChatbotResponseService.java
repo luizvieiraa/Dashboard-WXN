@@ -16,10 +16,13 @@ public class ChatbotResponseService {
 
     public String generateReply(ChatIntent intent) {
         return switch (intent) {
-            case GREETING -> "Olá! Como posso ajudar?";
-            case PRICE_INQUIRY -> "Claro. Vou verificar o preço solicitado e já te retorno.";
-            case HELP -> "Posso te ajudar com informações gerais. Diga 'oi' para começar ou pergunte sobre preços.";
-            case UNKNOWN -> "Não entendi sua mensagem. Pode reformular ou digitar 'ajuda' para ver as opções?";
+            case GREETING -> "Olá! 😊 Que bom falar com você. Como posso ajudar agora?";
+            case PRICE_INQUIRY -> "Claro! Entendi que você quer saber mais sobre valores. "
+                    + "Registrei seu interesse para que a equipe compartilhe as informações corretas para sua necessidade.";
+            case HELP -> "Estou por aqui para ajudar! Você pode perguntar sobre os serviços da WXN, "
+                    + "valores ou explicar o que gostaria de automatizar.";
+            case UNKNOWN -> "Não entendi direitinho, mas quero ajudar. Pode me contar de outra forma o que você precisa? "
+                    + "Se preferir, digite “ajuda” para ver algumas opções.";
         };
     }
 }

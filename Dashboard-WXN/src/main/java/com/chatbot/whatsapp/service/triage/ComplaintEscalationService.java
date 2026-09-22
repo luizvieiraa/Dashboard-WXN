@@ -15,7 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ComplaintEscalationService {
 
     public static final String HANDOFF_REPLY =
-            "Sinto muito pelo ocorrido. Encaminhei sua conversa para um atendente humano, que continuará o atendimento.";
+            "Sinto muito que você tenha passado por isso. Vou pausar o atendimento automático e chamar uma pessoa "
+                    + "da equipe para cuidar do seu caso com atenção. Você pode continuar enviando detalhes por aqui.";
 
     private final TriageRepository triageRepository;
     private final ConversationService conversationService;

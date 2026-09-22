@@ -64,7 +64,7 @@ class WhatsAppWebhookIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.conversationId", notNullValue()))
                 .andExpect(jsonPath("$.customerPhone", is("5511988887777")))
-                .andExpect(jsonPath("$.botReply", is("Para começar, qual é o seu nome?")))
+                .andExpect(jsonPath("$.botReply", org.hamcrest.Matchers.containsString("como posso te chamar")))
                 .andReturn().getResponse().getContentAsString();
 
         Long conversationId = objectMapper.readTree(responseJson).get("conversationId").asLong();
@@ -88,19 +88,19 @@ class WhatsAppWebhookIntegrationTest {
         JsonNode firstResponse = sendMessage(phone, "Quero contratar um chatbot");
         long conversationId = firstResponse.get("conversationId").asLong();
         org.assertj.core.api.Assertions.assertThat(firstResponse.get("botReply").asText())
-                .isEqualTo("Para começar, qual é o seu nome?");
+                .contains("como posso te chamar");
 
         JsonNode nameResponse = sendMessage(phone, "  Maria   Silva  ");
         org.assertj.core.api.Assertions.assertThat(nameResponse.get("botReply").asText())
-                .isEqualTo("Obrigado, Maria Silva. Qual é o nome da sua empresa?");
+                .contains("Prazer, Maria", "qual empresa");
 
         JsonNode companyResponse = sendMessage(phone, "Empresa Exemplo");
         org.assertj.core.api.Assertions.assertThat(companyResponse.get("botReply").asText())
-                .isEqualTo("Certo. Qual assunto ou informação você procura?");
+                .contains("Perfeito, Maria", "qual assunto");
 
         JsonNode subjectResponse = sendMessage(phone, "Automatizar a prospecção comercial");
         org.assertj.core.api.Assertions.assertThat(subjectResponse.get("botReply").asText())
-                .isEqualTo("Obrigado! Registrei suas informações e concluímos a triagem inicial.");
+                .contains("Tudo certo, Maria", "concluí a triagem inicial");
 
         mockMvc.perform(get("/api/v1/conversations/{id}", conversationId))
                 .andExpect(status().isOk())
@@ -132,7 +132,7 @@ class WhatsAppWebhookIntegrationTest {
         JsonNode complaintResponse = sendMessage(phone, "Na verdade estou insatisfeito, o sistema não funciona");
 
         org.assertj.core.api.Assertions.assertThat(complaintResponse.get("botReply").asText())
-                .contains("atendente humano");
+                .contains("pessoa da equipe", "continuar enviando detalhes");
 
         mockMvc.perform(get("/api/v1/conversations/{id}", conversationId))
                 .andExpect(status().isOk())
