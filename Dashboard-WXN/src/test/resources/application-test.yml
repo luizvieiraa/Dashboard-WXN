@@ -29,6 +29,12 @@ ai:
   timeout-seconds: 1
   max-output-tokens: 100
 
+conversation:
+  lifecycle:
+    enabled: false
+    inactivity-hours: 24
+    check-interval-ms: 300000
+
 logging:
   level:
     root: WARN

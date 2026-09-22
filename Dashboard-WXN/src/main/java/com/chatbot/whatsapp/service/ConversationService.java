@@ -25,9 +25,8 @@ public class ConversationService {
      * a cada mensagem, mantendo o historico agrupado enquanto o cliente
      * estiver "no meio" de um atendimento.
      *
-     * <p>A regra de quando uma conversa deve ser encerrada automaticamente
-     * (ex.: apos X horas de inatividade) ainda depende de definicao de
-     * negocio - PENDENTE DE DEFINICAO COM O CLIENTE.</p>
+     * <p>Conversas automatizadas antigas sao encerradas pelo processo de
+     * ciclo de vida. As que aguardam ou estao com um humano ficam preservadas.</p>
      */
     @Transactional
     public Conversation getOrCreateActiveConversation(Customer customer) {

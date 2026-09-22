@@ -108,6 +108,19 @@ preservando o atendimento mesmo quando o provedor estiver indisponível.
 O prompt proíbe inventar preços, prazos e políticas. Chaves e modelo são
 fornecidos apenas por variáveis de ambiente.
 
+## Ciclo de vida e inatividade
+
+`ConversationInactivityScheduler` executa periodicamente a regra de ciclo de
+vida. `ConversationLifecycleService` encerra conversas em `BOT_ACTIVE`,
+`COLLECTING_INFORMATION` ou `QUALIFIED` cuja última interação ultrapassou o
+limite configurado, registrando `closedAt` e o contexto
+`AUTO_CLOSED_INACTIVITY`.
+
+Conversas em `WAITING_HUMAN` ou `HUMAN_ACTIVE` ficam fora dessa consulta para
+que uma solicitação encaminhada não desapareça da fila operacional. Ao enviar
+uma nova mensagem depois do encerramento, o cliente inicia uma nova conversa,
+preservando o histórico anterior.
+
 ## Tratamento de erros
 
 Todas as exceções de negócio (`ResourceNotFoundException`,

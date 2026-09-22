@@ -313,6 +313,9 @@ Todas documentadas em [`.env.example`](.env.example). Resumo:
 | `AI_MODEL` | quando IA ativa | Modelo configurado no provedor |
 | `AI_TIMEOUT_SECONDS` | não (padrão 10) | Limite de espera pela IA antes do fallback |
 | `AI_MAX_OUTPUT_TOKENS` | não (padrão 300) | Limite de tokens da resposta gerada |
+| `CONVERSATION_AUTO_CLOSE_ENABLED` | não (padrão true) | Liga o encerramento de conversas automatizadas inativas |
+| `CONVERSATION_INACTIVITY_HOURS` | não (padrão 24) | Horas sem interação antes do encerramento automático |
+| `CONVERSATION_CHECK_INTERVAL_MS` | não (padrão 300000) | Intervalo entre verificações de inatividade |
 
 ## 15. Deploy
 
@@ -357,6 +360,8 @@ de responsabilidades".
   operar a fila de atendimento humano.
 * Respostas opcionais por IA após a triagem, com prompt restritivo, timeout
   e fallback automático para o comportamento local.
+* Encerramento automático e configurável de conversas do bot após
+  inatividade, sem retirar conversas da fila ou do atendimento humano.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.
@@ -370,7 +375,6 @@ de responsabilidades".
 
 * Definir com o cliente o provedor real de WhatsApp e implementar o
   `WhatsAppClient` correspondente (seção 13).
-* Regras de encerramento automático de conversas inativas.
 * Ampliar a base de conhecimento conforme os fluxos de negócio reais forem
   definidos (ex.: consulta a um catálogo de produtos).
 

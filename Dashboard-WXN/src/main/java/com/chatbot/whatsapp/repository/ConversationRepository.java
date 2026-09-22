@@ -3,6 +3,9 @@ package com.chatbot.whatsapp.repository;
 import com.chatbot.whatsapp.entity.Conversation;
 import com.chatbot.whatsapp.entity.Customer;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +13,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
     long countByStatus(ConversationStatus status);
+
+    List<Conversation> findByStatusInAndLastInteractionAtBefore(
+            Collection<ConversationStatus> statuses,
+            Instant cutoff);
 
     Optional<Conversation> findFirstByCustomerAndStatusNotOrderByStartedAtDesc(
             Customer customer,
