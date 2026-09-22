@@ -10,16 +10,19 @@ class KeywordIntentClassifierTest {
     private final KeywordIntentClassifier classifier = new KeywordIntentClassifier();
 
     @ParameterizedTest
-    @CsvSource({
-            "Olá, GREETING",
-            "oi tudo bem?, GREETING",
-            "Bom dia!, GREETING",
-            "Qual o preço do produto X?, PRICE_INQUIRY",
-            "Quanto custa o plano premium, PRICE_INQUIRY",
-            "ajuda, HELP",
-            "menu, HELP",
-            "xablau contexto aleatorio, UNKNOWN"
-    })
+    @CsvSource(value = {
+            "Olá|GREETING",
+            "oi tudo bem?|GREETING",
+            "Bom dia!|GREETING",
+            "Qual o preço do produto X?|PRICE_INQUIRY",
+            "Quanto custa o plano premium|PRICE_INQUIRY",
+            "Olá, gostaria de saber o preço|PRICE_INQUIRY",
+            "ajuda|HELP",
+            "menu|HELP",
+            "dois produtos|UNKNOWN",
+            "que coisa interessante|UNKNOWN",
+            "xablau contexto aleatorio|UNKNOWN"
+    }, delimiter = '|')
     void deveClassificarIntencaoCorretamente(String mensagem, ChatIntent intentEsperada) {
         assertThat(classifier.classify(mensagem)).isEqualTo(intentEsperada);
     }

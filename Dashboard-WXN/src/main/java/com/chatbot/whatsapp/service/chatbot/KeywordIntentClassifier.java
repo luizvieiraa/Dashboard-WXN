@@ -3,6 +3,7 @@ package com.chatbot.whatsapp.service.chatbot;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,17 +28,26 @@ public class KeywordIntentClassifier implements IntentClassifier {
         if (containsAny(normalized, HELP_KEYWORDS)) {
             return ChatIntent.HELP;
         }
-        if (containsAny(normalized, GREETING_KEYWORDS)) {
-            return ChatIntent.GREETING;
-        }
         if (containsAny(normalized, PRICE_KEYWORDS)) {
             return ChatIntent.PRICE_INQUIRY;
+        }
+        if (containsAny(normalized, GREETING_KEYWORDS)) {
+            return ChatIntent.GREETING;
         }
         return ChatIntent.UNKNOWN;
     }
 
     private boolean containsAny(String normalizedText, List<String> keywords) {
-        return keywords.stream().anyMatch(normalizedText::contains);
+        return keywords.stream().anyMatch(keyword -> containsWholeKeyword(normalizedText, keyword));
+    }
+
+    /**
+     * Evita falsos positivos de busca por substring. Por exemplo, a saudacao
+     * "oi" nao deve classificar palavras como "dois" ou "coisa".
+     */
+    private boolean containsWholeKeyword(String text, String keyword) {
+        String regex = "(?<![\\p{L}\\p{N}])" + Pattern.quote(keyword) + "(?![\\p{L}\\p{N}])";
+        return Pattern.compile(regex).matcher(text).find();
     }
 
     private String normalize(String text) {

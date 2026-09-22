@@ -44,7 +44,7 @@ public class ConversationService {
 
     @Transactional(readOnly = true)
     public Conversation findById(Long id) {
-        return conversationRepository.findById(id)
+        return conversationRepository.findOneById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversa nao encontrada: id=" + id));
     }
 

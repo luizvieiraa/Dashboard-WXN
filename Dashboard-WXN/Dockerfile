@@ -4,13 +4,11 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
-# Copia primeiro apenas o pom.xml para aproveitar o cache de dependencias
-# do Docker entre builds (só refaz o download se o pom.xml mudar).
+# O cache do Maven persiste entre builds, mesmo quando o codigo muda.
 COPY pom.xml .
-RUN mvn -B dependency:go-offline
-
 COPY src ./src
-RUN mvn -B clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B package -DskipTests
 
 # ---- Etapa 2: imagem final de execucao ----
 # Imagem enxuta, so com o JRE (nao o JDK completo) e o .jar gerado.

@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,7 +49,7 @@ class WhatsAppWebhookIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.conversationId", notNullValue()))
                 .andExpect(jsonPath("$.customerPhone", is("5511988887777")))
-                .andExpect(jsonPath("$.botReply", notNullValue()))
+                .andExpect(jsonPath("$.botReply", is("Claro. Vou verificar o preço solicitado e já te retorno.")))
                 .andReturn().getResponse().getContentAsString();
 
         Long conversationId = objectMapper.readTree(responseJson).get("conversationId").asLong();
@@ -79,8 +80,37 @@ class WhatsAppWebhookIntegrationTest {
     }
 
     @Test
+    void deveRetornar400QuandoJsonForInvalido() throws Exception {
+        mockMvc.perform(post("/api/v1/webhook/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("JSON invalido ou incompatível com o formato esperado")));
+    }
+
+    @Test
     void deveRetornar404ParaConversaInexistente() throws Exception {
         mockMvc.perform(get("/api/v1/conversations/{id}", 999999))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveRetornar400ParaIdNaoNumerico() throws Exception {
+        mockMvc.perform(get("/api/v1/conversations/abc"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void devePreservarErrosHttpDeRoteamentoENegociacaoDeConteudo() throws Exception {
+        mockMvc.perform(get("/api/v1/recurso-inexistente"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(put("/api/v1/health"))
+                .andExpect(status().isMethodNotAllowed());
+
+        mockMvc.perform(post("/api/v1/webhook/whatsapp")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("mensagem"))
+                .andExpect(status().isUnsupportedMediaType());
     }
 }

@@ -58,7 +58,7 @@ class MessageRepositoryTest {
         entityManager.persistAndFlush(first);
         entityManager.persistAndFlush(second);
 
-        List<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
+        List<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtAscIdAsc(conversation.getId());
 
         assertThat(messages).hasSize(2);
         assertThat(messages.get(0).getContent()).isEqualTo("Olá");

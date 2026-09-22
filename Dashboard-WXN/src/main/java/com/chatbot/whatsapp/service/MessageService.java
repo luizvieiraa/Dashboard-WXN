@@ -48,6 +48,6 @@ public class MessageService {
 
     @Transactional(readOnly = true)
     public List<Message> listByConversation(Long conversationId) {
-        return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        return messageRepository.findByConversationIdOrderByCreatedAtAscIdAsc(conversationId);
     }
 }
