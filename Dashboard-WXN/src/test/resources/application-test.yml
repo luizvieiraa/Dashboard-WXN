@@ -21,6 +21,14 @@ whatsapp:
   phone-number-id: ""
   webhook-verify-token: ""
 
+ai:
+  enabled: false
+  api-url: ""
+  api-key: ""
+  model: ""
+  timeout-seconds: 1
+  max-output-tokens: 100
+
 logging:
   level:
     root: WARN

@@ -9,7 +9,8 @@ import com.chatbot.whatsapp.entity.enums.MessageStatus;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
 import com.chatbot.whatsapp.service.chatbot.ChatIntent;
-import com.chatbot.whatsapp.service.chatbot.ChatbotResponseService;
+import com.chatbot.whatsapp.service.chatbot.GeneratedReply;
+import com.chatbot.whatsapp.service.chatbot.IntelligentResponseService;
 import com.chatbot.whatsapp.service.chatbot.IntentClassifier;
 import com.chatbot.whatsapp.service.triage.InformationCollectionService;
 import com.chatbot.whatsapp.service.triage.TriageCollectionResult;
@@ -42,7 +43,7 @@ public class MessageProcessingService {
     private final ComplaintDetector complaintDetector;
     private final ComplaintEscalationService complaintEscalationService;
     private final IntentClassifier intentClassifier;
-    private final ChatbotResponseService chatbotResponseService;
+    private final IntelligentResponseService intelligentResponseService;
     private final WhatsAppClient whatsAppClient;
 
     public MessageProcessingService(CustomerService customerService,
@@ -52,7 +53,7 @@ public class MessageProcessingService {
                                      ComplaintDetector complaintDetector,
                                      ComplaintEscalationService complaintEscalationService,
                                      IntentClassifier intentClassifier,
-                                     ChatbotResponseService chatbotResponseService,
+                                     IntelligentResponseService intelligentResponseService,
                                      WhatsAppClient whatsAppClient) {
         this.customerService = customerService;
         this.conversationService = conversationService;
@@ -61,7 +62,7 @@ public class MessageProcessingService {
         this.complaintDetector = complaintDetector;
         this.complaintEscalationService = complaintEscalationService;
         this.intentClassifier = intentClassifier;
-        this.chatbotResponseService = chatbotResponseService;
+        this.intelligentResponseService = intelligentResponseService;
         this.whatsAppClient = whatsAppClient;
     }
 
@@ -103,8 +104,11 @@ public class MessageProcessingService {
                 context = result.context();
             } else {
                 ChatIntent intent = intentClassifier.classify(request.message());
-                reply = chatbotResponseService.generateReply(intent);
-                context = intent.name();
+                GeneratedReply generatedReply = intelligentResponseService.generateReply(
+                        request.message(), intent, customer
+                );
+                reply = generatedReply.text();
+                context = generatedReply.context();
             }
         }
 

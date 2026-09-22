@@ -95,14 +95,18 @@ A interface em `static/dashboard` é servida pelo mesmo Spring Boot em
 visual separada das regras de negócio e sem exigir um segundo processo de
 frontend no desenvolvimento ou no deploy.
 
-## Por que não uma "IA" ou motor de regras complexo agora?
+## Respostas com IA e fallback
 
-O escopo pedido é uma base **funcional e explicável**. `IntentClassifier` é
-uma interface; a implementação atual (`KeywordIntentClassifier`) é
-propositalmente simples (casamento de palavras-chave). Trocar essa
-implementação por algo mais sofisticado (regras mais ricas, ou integração
-com um modelo de IA) no futuro não exige mudar nenhum outro ponto do
-sistema - é só implementar `IntentClassifier` de novo e trocar o bean.
+O fluxo crítico continua determinístico: reclamações são encaminhadas antes
+de qualquer chamada externa e a coleta estruturada não depende de IA. Depois
+da triagem, `IntelligentResponseService` tenta gerar uma resposta usando
+`AiClient`. `OpenAiResponsesClient` implementa o formato OpenAI Responses e
+fica desabilitado por padrão. Timeout, erro HTTP, resposta vazia ou
+configuração incompleta acionam automaticamente `ChatbotResponseService`,
+preservando o atendimento mesmo quando o provedor estiver indisponível.
+
+O prompt proíbe inventar preços, prazos e políticas. Chaves e modelo são
+fornecidos apenas por variáveis de ambiente.
 
 ## Tratamento de erros
 

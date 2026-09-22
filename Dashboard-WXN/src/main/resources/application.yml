@@ -35,6 +35,16 @@ whatsapp:
   phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
   webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
 
+# Geracao opcional de respostas com uma API compativel com OpenAI Responses.
+# Desabilitada por padrao; as respostas locais continuam sendo o fallback.
+ai:
+  enabled: ${AI_ENABLED:false}
+  api-url: ${AI_API_URL:https://api.openai.com/v1/responses}
+  api-key: ${AI_API_KEY:}
+  model: ${AI_MODEL:}
+  timeout-seconds: ${AI_TIMEOUT_SECONDS:10}
+  max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:300}
+
 server:
   port: ${SERVER_PORT:8080}
   error:

@@ -77,6 +77,10 @@ termos de reclamação ou um pedido explícito por atendente, a conversa passa
 para `WAITING_HUMAN`, a triagem recebe categoria `COMPLAINT`, prioridade
 `HIGH` e `requiresHuman=true`.
 
+Depois que a triagem termina, respostas gerais podem ser geradas por IA
+quando `AI_ENABLED=true`. Se o provedor falhar ou estiver desabilitado, a
+resposta local baseada em intenção é usada automaticamente.
+
 * **Erros**:
   * `400 Bad Request` - `phone` ou `message` ausentes/inválidos (corpo no formato padrão de erro, ver abaixo).
 

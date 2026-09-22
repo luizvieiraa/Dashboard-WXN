@@ -53,6 +53,7 @@ Detalhamento completo do fluxo em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 * **PostgreSQL** (banco relacional) + **Flyway** (migrations)
 * **Maven** (ver justificativa na seção 4.1)
 * **springdoc-openapi** (Swagger UI / OpenAPI 3)
+* **API de IA configurável** (formato OpenAI Responses, com fallback local)
 * **Lombok**
 * **JUnit 5, MockMvc, AssertJ, H2** (testes)
 * **Docker / Docker Compose**
@@ -306,6 +307,12 @@ Todas documentadas em [`.env.example`](.env.example). Resumo:
 | `WHATSAPP_ACCESS_TOKEN` | não | Token de acesso do provedor - PENDENTE DE DEFINIÇÃO |
 | `WHATSAPP_PHONE_NUMBER_ID` | não | Id do número remetente - PENDENTE DE DEFINIÇÃO |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | não | Token de verificação do webhook - PENDENTE DE DEFINIÇÃO |
+| `AI_ENABLED` | não (padrão false) | Habilita respostas geradas por IA depois da triagem |
+| `AI_API_URL` | quando IA ativa | Endpoint compatível com o formato OpenAI Responses |
+| `AI_API_KEY` | quando IA ativa | Chave do provedor, mantida somente no ambiente |
+| `AI_MODEL` | quando IA ativa | Modelo configurado no provedor |
+| `AI_TIMEOUT_SECONDS` | não (padrão 10) | Limite de espera pela IA antes do fallback |
+| `AI_MAX_OUTPUT_TOKENS` | não (padrão 300) | Limite de tokens da resposta gerada |
 
 ## 15. Deploy
 
@@ -348,6 +355,8 @@ de responsabilidades".
   triagens, ordenada por prioridade e interação mais recente.
 * Interface web responsiva para acompanhar indicadores, filtrar triagens e
   operar a fila de atendimento humano.
+* Respostas opcionais por IA após a triagem, com prompt restritivo, timeout
+  e fallback automático para o comportamento local.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.
@@ -362,7 +371,7 @@ de responsabilidades".
 * Definir com o cliente o provedor real de WhatsApp e implementar o
   `WhatsAppClient` correspondente (seção 13).
 * Regras de encerramento automático de conversas inativas.
-* Ampliar o `IntentClassifier` conforme os fluxos de negócio reais forem
+* Ampliar a base de conhecimento conforme os fluxos de negócio reais forem
   definidos (ex.: consulta a um catálogo de produtos).
 
 **Possíveis melhorias futuras:**
