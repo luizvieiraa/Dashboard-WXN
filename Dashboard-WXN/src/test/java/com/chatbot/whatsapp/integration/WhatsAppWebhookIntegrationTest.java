@@ -147,6 +147,50 @@ class WhatsAppWebhookIntegrationTest {
     }
 
     @Test
+    void devePermitirAtendenteAssumirResponderEEncerrarConversa() throws Exception {
+        String phone = "5511970000003";
+        long conversationId = sendMessage(phone, "Quero reclamar de uma cobrança indevida")
+                .get("conversationId").asLong();
+
+        JsonNode queuedMessage = sendMessage(phone, "Tenho o comprovante aqui");
+        org.assertj.core.api.Assertions.assertThat(queuedMessage.get("botReply").isNull()).isTrue();
+
+        mockMvc.perform(post("/api/v1/conversations/{id}/human/claim", conversationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("attendant", "Carlos Lima"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("HUMAN_ACTIVE")))
+                .andExpect(jsonPath("$.assignedTo", is("Carlos Lima")))
+                .andExpect(jsonPath("$.assignedAt", notNullValue()));
+
+        mockMvc.perform(post("/api/v1/conversations/{id}/human/reply", conversationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "message", "Olá, sou Carlos. Vou analisar seu comprovante."
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context", is("HUMAN_REPLY")))
+                .andExpect(jsonPath("$.messages.length()", is(4)))
+                .andExpect(jsonPath("$.messages[3].direction", is("OUTBOUND")));
+
+        mockMvc.perform(post("/api/v1/conversations/{id}/close", conversationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("CLOSED")))
+                .andExpect(jsonPath("$.closedAt", notNullValue()));
+    }
+
+    @Test
+    void deveRetornar409AoResponderConversaNaoAssumida() throws Exception {
+        long conversationId = sendMessage("5511970000004", "Quero fazer uma reclamação")
+                .get("conversationId").asLong();
+
+        mockMvc.perform(post("/api/v1/conversations/{id}/human/reply", conversationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("message", "Resposta"))))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void deveRetornar400QuandoTelefoneEstiverAusente() throws Exception {
         String payload = """
                 {

@@ -335,6 +335,8 @@ de responsabilidades".
   da triagem.
 * Detecção de reclamações com interrupção da automação e encaminhamento
   prioritário para atendimento humano.
+* API de atendimento humano para assumir a fila, responder ao cliente e
+  encerrar a conversa sem concorrência com respostas automáticas.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.

@@ -63,4 +63,13 @@ public class Conversation {
 
     @Column(name = "last_interaction_at", nullable = false)
     private Instant lastInteractionAt;
+
+    @Column(name = "assigned_to")
+    private String assignedTo;
+
+    @Column(name = "assigned_at")
+    private Instant assignedAt;
+
+    @Column(name = "closed_at")
+    private Instant closedAt;
 }

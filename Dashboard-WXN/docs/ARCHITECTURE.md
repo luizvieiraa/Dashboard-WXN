@@ -80,6 +80,11 @@ regra dentro do Controller" é resolvido colocando a orquestração em
       apenas loga a mensagem - ver `docs/DEVELOPMENT.md` e o README).
 3. O controller devolve `201 Created` com um resumo do que foi processado.
 
+Enquanto a conversa estiver em `WAITING_HUMAN` ou `HUMAN_ACTIVE`, o webhook
+continua persistindo mensagens recebidas, mas não gera resposta automática.
+A equipe opera a fila pelos endpoints de assumir, responder e encerrar em
+`ConversationController` e `HumanAttendanceService`.
+
 ## Por que não uma "IA" ou motor de regras complexo agora?
 
 O escopo pedido é uma base **funcional e explicável**. `IntentClassifier` é

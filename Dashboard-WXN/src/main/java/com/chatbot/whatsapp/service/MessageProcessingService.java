@@ -6,6 +6,7 @@ import com.chatbot.whatsapp.entity.Conversation;
 import com.chatbot.whatsapp.entity.Customer;
 import com.chatbot.whatsapp.entity.Message;
 import com.chatbot.whatsapp.entity.enums.MessageStatus;
+import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
 import com.chatbot.whatsapp.service.chatbot.ChatIntent;
 import com.chatbot.whatsapp.service.chatbot.ChatbotResponseService;
@@ -70,6 +71,19 @@ public class MessageProcessingService {
         Conversation conversation = conversationService.getOrCreateActiveConversation(customer);
 
         Message inboundMessage = messageService.recordInbound(conversation, request.message());
+
+        if (conversation.getStatus() == ConversationStatus.WAITING_HUMAN
+                || conversation.getStatus() == ConversationStatus.HUMAN_ACTIVE) {
+            messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
+            conversationService.touch(conversation, "HUMAN_QUEUE_MESSAGE");
+            return new WhatsAppWebhookResponse(
+                    conversation.getId(),
+                    customer.getPhoneNumber(),
+                    request.message(),
+                    null,
+                    Instant.now()
+            );
+        }
 
         String reply;
         String context;

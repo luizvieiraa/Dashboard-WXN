@@ -120,6 +120,27 @@ em ordem cronológica.
 
 ---
 
+## Atendimento humano
+
+### `POST /api/v1/conversations/{id}/human/claim`
+
+Atribui uma conversa em `WAITING_HUMAN` a um atendente e altera o status
+para `HUMAN_ACTIVE`. Body: `{"attendant":"Carlos Lima"}`.
+
+### `POST /api/v1/conversations/{id}/human/reply`
+
+Registra e envia uma resposta do atendente em uma conversa `HUMAN_ACTIVE`.
+Body: `{"message":"Olá, vou analisar o ocorrido."}`.
+
+### `POST /api/v1/conversations/{id}/close`
+
+Encerra a conversa e registra `closedAt`. Uma mensagem posterior do cliente
+abrirá uma nova conversa.
+
+As operações incompatíveis com o estado atual retornam `409 Conflict`.
+
+---
+
 ## Formato padrão de erro
 
 Toda resposta de erro da API segue este formato:
@@ -146,4 +167,5 @@ em erros de validação (`400`).
 | 201 | Mensagem recebida e processada com sucesso |
 | 400 | Payload inválido (validação) |
 | 404 | Recurso não encontrado (ex.: conversa) |
+| 409 | Operação incompatível com o estado atual da conversa |
 | 500 | Erro interno inesperado |

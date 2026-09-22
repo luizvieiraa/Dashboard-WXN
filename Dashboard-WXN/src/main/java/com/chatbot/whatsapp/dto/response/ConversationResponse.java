@@ -16,6 +16,9 @@ public record ConversationResponse(
         String context,
         Instant startedAt,
         Instant lastInteractionAt,
+        String assignedTo,
+        Instant assignedAt,
+        Instant closedAt,
         List<MessageResponse> messages
 ) {
     public static ConversationResponse fromEntity(Conversation conversation, List<MessageResponse> messages) {
@@ -27,6 +30,9 @@ public record ConversationResponse(
                 conversation.getContext(),
                 conversation.getStartedAt(),
                 conversation.getLastInteractionAt(),
+                conversation.getAssignedTo(),
+                conversation.getAssignedAt(),
+                conversation.getClosedAt(),
                 messages
         );
     }

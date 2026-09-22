@@ -62,6 +62,9 @@ todas estiverem `CLOSED`, uma nova é criada com status `BOT_ACTIVE`.
 | context | VARCHAR(1000) | texto livre e opcional com o último assunto identificado (ex.: nome da última intenção reconhecida) |
 | started_at | TIMESTAMP | criação da conversa |
 | last_interaction_at | TIMESTAMP | atualizado a cada mensagem |
+| assigned_to | VARCHAR(255) | atendente responsável, quando assumida |
+| assigned_at | TIMESTAMP | momento em que o atendente assumiu |
+| closed_at | TIMESTAMP | momento do encerramento |
 
 Estados disponíveis: `BOT_ACTIVE`, `COLLECTING_INFORMATION`, `QUALIFIED`,
 `WAITING_HUMAN`, `HUMAN_ACTIVE` e `CLOSED`. A regra de encerramento
@@ -120,7 +123,8 @@ mensagem pertence a exatamente uma conversa. Uma conversa pode ter uma
 O schema é versionado com Flyway (`src/main/resources/db/migration`).
 `V1__init.sql` cria o schema inicial. `V2__add_triage_domain.sql` adiciona
 os campos de perfil do cliente, os novos estados de conversa e as tabelas
-de triagem. O Hibernate roda em modo `validate`: ele **não** gera
+de triagem. `V3__add_human_attendance_fields.sql` registra atribuição e
+encerramento do atendimento humano. O Hibernate roda em modo `validate`: ele **não** gera
 nem altera o schema, apenas confere se as entidades batem com as tabelas
 já criadas pelo Flyway. Isso evita divergência entre o que o código espera
 e o que realmente existe no banco, e mantém um histórico auditável de
