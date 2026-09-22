@@ -4,11 +4,9 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
-# O cache do Maven persiste entre builds, mesmo quando o codigo muda.
 COPY pom.xml .
 COPY src ./src
-RUN --mount=type=cache,id=maven-repository,target=/root/.m2/repository \
-    mvn -B package -DskipTests
+RUN mvn -B package -DskipTests
 
 # ---- Etapa 2: imagem final de execucao ----
 # Imagem enxuta, so com o JRE (nao o JDK completo) e o .jar gerado.
