@@ -217,6 +217,17 @@ class WhatsAppWebhookIntegrationTest {
     }
 
     @Test
+    void deveServirInterfaceWebDoDashboard() throws Exception {
+        mockMvc.perform(get("/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/dashboard/index.html"));
+
+        mockMvc.perform(get("/dashboard/app.js"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void deveRetornar400QuandoTelefoneEstiverAusente() throws Exception {
         String payload = """
                 {

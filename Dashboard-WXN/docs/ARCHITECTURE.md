@@ -85,10 +85,15 @@ continua persistindo mensagens recebidas, mas não gera resposta automática.
 A equipe opera a fila pelos endpoints de assumir, responder e encerrar em
 `ConversationController` e `HumanAttendanceService`.
 
-`DashboardController` expõe uma visão de leitura preparada para o futuro
-front-end. `DashboardService` consolida contagens e transforma `Triage` em
+`DashboardController` expõe a visão de leitura usada pelo front-end.
+`DashboardService` consolida contagens e transforma `Triage` em
 DTOs com os dados essenciais do cliente e da conversa, sem expor entidades
 JPA diretamente.
+
+A interface em `static/dashboard` é servida pelo mesmo Spring Boot em
+`/dashboard`. Ela consome somente a API REST existente, mantendo a camada
+visual separada das regras de negócio e sem exigir um segundo processo de
+frontend no desenvolvimento ou no deploy.
 
 ## Por que não uma "IA" ou motor de regras complexo agora?
 

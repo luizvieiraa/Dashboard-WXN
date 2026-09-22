@@ -107,7 +107,7 @@ src/main/java/com/chatbot/whatsapp/
 ## 6. Banco de dados
 
 Quatro entidades: `Customer`, `Conversation`, `Message` e `Triage`. A triagem
-organiza os dados que serão consumidos pelo futuro dashboard. Justificativa
+organiza os dados consumidos pelo dashboard operacional. Justificativa
 de cada entidade, atributos, relacionamentos e como as
 migrations Flyway funcionam: [`docs/DATABASE.md`](docs/DATABASE.md).
 
@@ -185,6 +185,8 @@ docker compose logs -f db      # acompanha os logs do banco
 ```
 
 A API fica disponível em `http://localhost:8080`.
+
+O dashboard operacional fica em `http://localhost:8080/dashboard`.
 
 ## 10. Como executar os testes
 
@@ -344,6 +346,8 @@ de responsabilidades".
   encerrar a conversa sem concorrência com respostas automáticas.
 * API de dashboard com indicadores consolidados e listagem filtrável de
   triagens, ordenada por prioridade e interação mais recente.
+* Interface web responsiva para acompanhar indicadores, filtrar triagens e
+  operar a fila de atendimento humano.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.

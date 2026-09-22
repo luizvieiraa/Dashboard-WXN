@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Central operacional de triagens e atendimentos da WXN">
+    <title>WXN | Central de atendimento</title>
+    <link rel="stylesheet" href="/dashboard/styles.css">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="/dashboard" aria-label="WXN - Central de atendimento">
+            <span class="brand-mark" aria-hidden="true">W</span>
+            <span>
+                <strong>WXN</strong>
+                <small>Central de atendimento</small>
+            </span>
+        </a>
+
+        <nav>
+            <a class="nav-item active" href="#overview">
+                <span aria-hidden="true">▦</span> Visão geral
+            </a>
+            <a class="nav-item" href="#triages">
+                <span aria-hidden="true">≡</span> Triagens
+            </a>
+        </nav>
+
+        <div class="sidebar-status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+                <strong>Sistema conectado</strong>
+                <small>Dados atualizados pela API</small>
+            </span>
+        </div>
+    </aside>
+
+    <main>
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Operação em tempo real</p>
+                <h1>Central de atendimento</h1>
+            </div>
+            <div class="topbar-actions">
+                <span id="last-updated" class="last-updated">Carregando dados...</span>
+                <button id="refresh-button" class="button button-secondary" type="button">
+                    <span aria-hidden="true">↻</span> Atualizar
+                </button>
+            </div>
+        </header>
+
+        <section id="overview" class="section" aria-labelledby="overview-title">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Resumo</p>
+                    <h2 id="overview-title">Visão geral</h2>
+                </div>
+                <span id="queue-alert" class="queue-alert" hidden></span>
+            </div>
+
+            <div id="metrics" class="metrics" aria-live="polite">
+                <article class="metric-card metric-total">
+                    <span class="metric-icon" aria-hidden="true">◎</span>
+                    <div><span>Clientes</span><strong data-metric="totalCustomers">—</strong></div>
+                    <small>contatos cadastrados</small>
+                </article>
+                <article class="metric-card metric-qualified">
+                    <span class="metric-icon" aria-hidden="true">✓</span>
+                    <div><span>Qualificados</span><strong data-metric="qualified">—</strong></div>
+                    <small>triagens concluídas</small>
+                </article>
+                <article class="metric-card metric-waiting">
+                    <span class="metric-icon" aria-hidden="true">!</span>
+                    <div><span>Aguardando humano</span><strong data-metric="waitingHuman">—</strong></div>
+                    <small>na fila de atendimento</small>
+                </article>
+                <article class="metric-card metric-active">
+                    <span class="metric-icon" aria-hidden="true">→</span>
+                    <div><span>Em atendimento</span><strong data-metric="humanActive">—</strong></div>
+                    <small>com atendente ativo</small>
+                </article>
+                <article class="metric-card metric-complaints">
+                    <span class="metric-icon" aria-hidden="true">△</span>
+                    <div><span>Reclamações</span><strong data-metric="complaints">—</strong></div>
+                    <small>casos identificados</small>
+                </article>
+            </div>
+        </section>
+
+        <section id="triages" class="section triage-section" aria-labelledby="triages-title">
+            <div class="section-heading triage-heading">
+                <div>
+                    <p class="eyebrow">Acompanhamento</p>
+                    <h2 id="triages-title">Triagens recentes</h2>
+                </div>
+                <span id="result-count" class="result-count">0 resultados</span>
+            </div>
+
+            <form id="filters" class="filters" aria-label="Filtros de triagem">
+                <label>
+                    <span>Categoria</span>
+                    <select name="category">
+                        <option value="">Todas</option>
+                        <option value="INFORMATION">Informação</option>
+                        <option value="COMPLAINT">Reclamação</option>
+                        <option value="OTHER">Outro</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Status</span>
+                    <select name="status">
+                        <option value="">Todos</option>
+                        <option value="COLLECTING_INFORMATION">Coletando informações</option>
+                        <option value="QUALIFIED">Qualificado</option>
+                        <option value="WAITING_HUMAN">Aguardando humano</option>
+                        <option value="HUMAN_ACTIVE">Em atendimento</option>
+                        <option value="CLOSED">Encerrado</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Atendimento</span>
+                    <select name="requiresHuman">
+                        <option value="">Todos</option>
+                        <option value="true">Requer humano</option>
+                        <option value="false">Automático</option>
+                    </select>
+                </label>
+                <button class="button button-primary" type="submit">Aplicar filtros</button>
+                <button id="clear-filters" class="button button-ghost" type="button">Limpar</button>
+            </form>
+
+            <div id="feedback" class="feedback" role="status" aria-live="polite">Carregando triagens...</div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Assunto</th>
+                        <th>Categoria</th>
+                        <th>Prioridade</th>
+                        <th>Status</th>
+                        <th class="actions-column">Ação</th>
+                    </tr>
+                    </thead>
+                    <tbody id="triage-rows"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<dialog id="action-dialog" aria-labelledby="dialog-title">
+    <form id="action-form" method="dialog">
+        <div class="dialog-header">
+            <div>
+                <p class="eyebrow">Atendimento humano</p>
+                <h2 id="dialog-title">Assumir conversa</h2>
+            </div>
+            <button id="dialog-close" class="icon-button" type="button" aria-label="Fechar">×</button>
+        </div>
+        <p id="dialog-context" class="dialog-context"></p>
+        <label id="dialog-field">
+            <span id="dialog-label">Nome do atendente</span>
+            <input id="dialog-input" maxlength="4096" required>
+        </label>
+        <p id="dialog-error" class="dialog-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+            <button id="dialog-cancel" class="button button-ghost" type="button">Cancelar</button>
+            <button id="dialog-submit" class="button button-primary" type="submit">Confirmar</button>
+        </div>
+    </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="/dashboard/app.js" defer></script>
+</body>
+</html>
