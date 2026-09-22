@@ -333,3 +333,110 @@ h1, h2 { color: #f3f7ff; }
 @media (max-width: 780px) {
     .topbar { background: transparent; }
 }
+
+/* Mobile refinement */
+@media (max-width: 780px) {
+    body { overflow-x: hidden; }
+    .app-shell { min-width: 0; }
+    .sidebar {
+        position: sticky;
+        z-index: 20;
+        top: 8px;
+        width: auto;
+        min-height: auto;
+        margin: 8px;
+        padding: 10px 12px;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        border-radius: 17px;
+    }
+    .brand { min-width: 0; padding: 0; }
+    .brand > span:last-child { min-width: 0; }
+    .brand small, .sidebar-status { display: none; }
+    .brand-mark { flex: 0 0 auto; }
+    .sidebar nav {
+        display: flex;
+        min-width: 0;
+        margin-left: auto;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .sidebar nav::-webkit-scrollbar { display: none; }
+    .nav-item {
+        min-height: 42px;
+        padding: 0 10px;
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+    .nav-item:hover, .nav-item:focus-visible { transform: none; }
+    main { min-width: 0; margin-left: 0; padding: 0 16px 32px; }
+    .topbar {
+        position: static;
+        min-height: auto;
+        padding: 22px 0 16px;
+        gap: 16px;
+        background: transparent;
+        backdrop-filter: none;
+    }
+    .workspace { gap: 16px; padding-top: 14px; }
+    .chat-panel {
+        height: min(680px, calc(100dvh - 144px));
+        min-height: 500px;
+        max-height: none;
+    }
+    .message-list { min-height: 0; padding: 24px clamp(14px, 4vw, 28px); }
+    .message-content { max-width: 82%; }
+    .context-panel { gap: 14px; }
+    .context-card { padding: 18px; }
+    .scenario-list button { min-height: 62px; }
+    .toast { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+}
+
+@media (max-width: 570px) {
+    .sidebar { padding: 9px 10px; }
+    .brand > span:last-child { display: none; }
+    .brand-mark { width: 38px; height: 38px; }
+    .nav-item { padding: 0 9px; font-size: .8rem; }
+    .nav-item span { display: none; }
+    main { padding-inline: 12px; }
+    h1 { font-size: clamp(1.6rem, 8vw, 2rem); }
+    .topbar { display: block; padding-top: 18px; }
+    .topbar .button { width: 100%; margin-top: 14px; }
+    .workspace { padding-top: 10px; }
+    .chat-panel {
+        height: calc(100dvh - 238px);
+        min-height: 470px;
+        border-radius: 18px;
+    }
+    .chat-header { min-height: 72px; padding: 12px 14px; }
+    .bot-avatar { width: 42px; height: 42px; border-radius: 14px; }
+    .conversation-id { display: none; }
+    .message-list { padding: 18px 12px; }
+    .message-content { max-width: 88%; }
+    .message-bubble { padding: 11px 13px; }
+    .empty-state { padding-inline: 8px; }
+    .empty-mark { width: 56px; height: 56px; }
+    .composer { gap: 8px; padding: 10px 10px 7px; }
+    .composer textarea { min-height: 46px; padding: 11px 12px; }
+    .send-button { width: 46px; min-width: 46px; height: 46px; }
+    .send-button span:first-child { display: none; }
+    .composer-hint { display: none; }
+    .context-panel { grid-template-columns: 1fr; }
+    .handoff-note { grid-column: auto; }
+    .context-card { border-radius: 17px; }
+    .phone-field input { min-width: 0; }
+}
+
+@media (max-width: 380px) {
+    .nav-item { padding-inline: 7px; font-size: .75rem; }
+    .chat-panel { min-height: 440px; }
+    .chat-header h2 { font-size: .98rem; }
+    .chat-header p { font-size: .7rem; }
+    .message-content { max-width: 92%; }
+}
+
+@media (max-height: 650px) and (max-width: 570px) {
+    .chat-panel { height: 520px; min-height: 520px; }
+}

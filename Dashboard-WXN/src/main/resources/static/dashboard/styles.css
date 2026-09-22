@@ -532,3 +532,114 @@ dialog { border-color: rgba(145,169,202,.2); background: rgba(9,22,39,.98); colo
     .topbar { background: transparent; }
     tbody tr { border-color: rgba(145,169,202,.16); background: rgba(10,24,42,.9); }
 }
+
+/* Mobile refinement */
+@media (max-width: 780px) {
+    html { scroll-padding-top: 88px; }
+    body { overflow-x: hidden; }
+    .app-shell { min-width: 0; }
+    .sidebar {
+        position: sticky;
+        z-index: 20;
+        top: 8px;
+        width: auto;
+        min-height: auto;
+        margin: 8px;
+        padding: 10px 12px;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        border-radius: 17px;
+    }
+    .brand { min-width: 0; padding: 0; }
+    .brand > span:last-child { min-width: 0; }
+    .brand small, .sidebar-status { display: none; }
+    .brand-mark { flex: 0 0 auto; }
+    .sidebar nav {
+        display: flex;
+        min-width: 0;
+        margin-left: auto;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .sidebar nav::-webkit-scrollbar { display: none; }
+    .nav-item {
+        min-height: 42px;
+        padding: 0 10px;
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+    .nav-item:hover, .nav-item:focus-visible { transform: none; }
+    main { min-width: 0; margin-left: 0; padding: 0 16px 36px; }
+    .topbar {
+        position: static;
+        min-height: auto;
+        padding: 22px 0 16px;
+        gap: 16px;
+        background: transparent;
+        backdrop-filter: none;
+    }
+    .topbar-actions { gap: 8px; }
+    .section { padding-top: 24px; }
+    .metric-card { min-height: 144px; padding: 18px; }
+    .metric-card > div { margin-top: 20px; }
+    .metric-card strong { font-size: 1.9rem; }
+    .filters { padding: 16px; }
+    .table-wrap { margin-top: 14px; }
+    tbody tr { padding: 15px; }
+    td { min-width: 0; align-items: flex-start; }
+    td::before { flex: 0 0 34%; padding-top: 3px; }
+    td > * { min-width: 0; }
+    .customer-cell, .subject-cell { max-width: none; overflow-wrap: anywhere; text-align: right; }
+    .actions { flex-wrap: wrap; }
+    dialog {
+        width: calc(100% - 24px);
+        max-width: 520px;
+        max-height: calc(100dvh - 24px);
+        padding: 20px;
+        overflow-y: auto;
+    }
+    .toast { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+}
+
+@media (max-width: 560px) {
+    .sidebar { padding: 9px 10px; }
+    .brand > span:last-child { display: none; }
+    .brand-mark { width: 38px; height: 38px; }
+    .nav-item { padding: 0 9px; font-size: .8rem; }
+    .nav-item span { display: none; }
+    main { padding-inline: 12px; }
+    h1 { font-size: clamp(1.6rem, 8vw, 2rem); }
+    .topbar { display: block; padding-top: 18px; }
+    .topbar-actions {
+        margin-top: 14px;
+        align-items: stretch;
+        flex-direction: column-reverse;
+    }
+    .topbar-actions .button { width: 100%; }
+    .last-updated { text-align: left; }
+    .section-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .metric-card { min-height: 132px; padding: 15px; }
+    .metric-card > div { margin-top: 15px; }
+    .metric-card strong { font-size: 1.7rem; }
+    .metric-card small { line-height: 1.25; }
+    .metric-icon { width: 32px; height: 32px; }
+    .filters { grid-template-columns: 1fr; gap: 12px; }
+    .filters label:last-of-type { grid-column: auto; }
+    .filters .button { width: 100%; grid-row: auto; }
+    td { gap: 10px; }
+    td::before { flex-basis: 31%; }
+    .actions { width: 100%; }
+    .actions .button { flex: 1 1 130px; }
+    .dialog-header h2 { font-size: 1.35rem; }
+    .dialog-actions { flex-direction: column-reverse; }
+    .dialog-actions .button { width: 100%; }
+}
+
+@media (max-width: 380px) {
+    .nav-item { padding-inline: 7px; font-size: .75rem; }
+    .metrics { grid-template-columns: 1fr; }
+    .metric-card { min-height: 124px; }
+}
