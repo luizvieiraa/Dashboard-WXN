@@ -225,6 +225,14 @@ class WhatsAppWebhookIntegrationTest {
 
         mockMvc.perform(get("/dashboard/app.js"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/simulator"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/simulator/index.html"));
+
+        mockMvc.perform(get("/simulator/app.js"))
+                .andExpect(status().isOk());
     }
 
     @Test

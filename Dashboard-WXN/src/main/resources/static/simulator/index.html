@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Simulador de conversa do chatbot da WXN">
+    <title>WXN | Simulador de conversa</title>
+    <link rel="stylesheet" href="/simulator/styles.css">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="/dashboard" aria-label="WXN - Central de atendimento">
+            <span class="brand-mark" aria-hidden="true">W</span>
+            <span>
+                <strong>WXN</strong>
+                <small>Central de atendimento</small>
+            </span>
+        </a>
+
+        <nav>
+            <a class="nav-item" href="/dashboard">
+                <span aria-hidden="true">&#9671;</span> Visão geral
+            </a>
+            <a class="nav-item active" href="/simulator">
+                <span aria-hidden="true">&#9675;</span> Simulador
+            </a>
+        </nav>
+
+        <div class="sidebar-status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+                <strong>Ambiente de simulação</strong>
+                <small>Conectado à API local</small>
+            </span>
+        </div>
+    </aside>
+
+    <main>
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Experiência do cliente</p>
+                <h1>Simulador de conversa</h1>
+            </div>
+            <button id="new-session" class="button button-secondary" type="button">
+                <span aria-hidden="true">+</span> Nova simulação
+            </button>
+        </header>
+
+        <div class="workspace">
+            <section class="chat-panel" aria-labelledby="chat-title">
+                <header class="chat-header">
+                    <div class="bot-avatar" aria-hidden="true">WX</div>
+                    <div>
+                        <h2 id="chat-title">Assistente WXN</h2>
+                        <p><span class="online-dot" aria-hidden="true"></span> Disponível para atender</p>
+                    </div>
+                    <span id="conversation-id" class="conversation-id">Nova conversa</span>
+                </header>
+
+                <div id="message-list" class="message-list" role="log" aria-live="polite" aria-relevant="additions">
+                    <div id="empty-state" class="empty-state">
+                        <span class="empty-mark" aria-hidden="true">W</span>
+                        <h2>Converse com o chatbot</h2>
+                        <p>Envie uma mensagem para iniciar a triagem como se você fosse um cliente da WXN.</p>
+                    </div>
+                </div>
+
+                <div id="typing" class="typing" hidden aria-label="O assistente está digitando">
+                    <span></span><span></span><span></span>
+                </div>
+
+                <form id="message-form" class="composer">
+                    <label class="sr-only" for="message-input">Mensagem</label>
+                    <textarea id="message-input" rows="1" maxlength="4096"
+                              placeholder="Digite uma mensagem..." required></textarea>
+                    <button id="send-button" class="send-button" type="submit" aria-label="Enviar mensagem">
+                        <span>Enviar</span><span aria-hidden="true">&#8593;</span>
+                    </button>
+                </form>
+                <p id="composer-hint" class="composer-hint">Enter para enviar · Shift + Enter para quebrar linha</p>
+            </section>
+
+            <aside class="context-panel" aria-label="Configurações da simulação">
+                <section class="context-card session-card">
+                    <div class="card-heading">
+                        <div>
+                            <p class="eyebrow">Sessão atual</p>
+                            <h2>Cliente simulado</h2>
+                        </div>
+                        <span id="status-badge" class="status-badge status-new">Novo</span>
+                    </div>
+
+                    <label for="phone-input">Telefone do cliente</label>
+                    <div class="phone-field">
+                        <span aria-hidden="true">ID</span>
+                        <input id="phone-input" inputmode="numeric" autocomplete="off"
+                               maxlength="15" aria-describedby="phone-help">
+                    </div>
+                    <p id="phone-help" class="field-help">Use de 8 a 15 dígitos. O telefone identifica e mantém a conversa.</p>
+
+                    <dl class="session-details">
+                        <div><dt>Canal</dt><dd>Simulador web</dd></div>
+                        <div><dt>Estado</dt><dd id="status-label">Aguardando início</dd></div>
+                        <div><dt>Última atividade</dt><dd id="last-activity">—</dd></div>
+                    </dl>
+                </section>
+
+                <section class="context-card">
+                    <div class="card-heading compact">
+                        <div>
+                            <p class="eyebrow">Cenários rápidos</p>
+                            <h2>Teste o atendimento</h2>
+                        </div>
+                    </div>
+                    <div class="scenario-list">
+                        <button type="button" data-message="Olá, quero conhecer os serviços da WXN">
+                            <strong>Buscar informações</strong>
+                            <small>Inicia uma triagem comercial</small>
+                        </button>
+                        <button type="button" data-message="Gostaria de saber quanto custa o serviço">
+                            <strong>Perguntar preço</strong>
+                            <small>Testa uma intenção de compra</small>
+                        </button>
+                        <button type="button" data-message="Estou insatisfeito e quero falar com um atendente">
+                            <strong>Fazer uma reclamação</strong>
+                            <small>Encaminha para atendimento humano</small>
+                        </button>
+                    </div>
+                </section>
+
+                <div id="handoff-note" class="handoff-note" hidden>
+                    <strong>Atendimento encaminhado</strong>
+                    <p>O chatbot pausou as respostas. Esta conversa já aparece na fila do dashboard.</p>
+                    <a href="/dashboard">Abrir central de atendimento</a>
+                </div>
+            </aside>
+        </div>
+    </main>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="/simulator/app.js" defer></script>
+</body>
+</html>

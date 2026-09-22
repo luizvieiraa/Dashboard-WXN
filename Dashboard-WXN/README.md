@@ -228,6 +228,12 @@ Também é possível testar diretamente pelo Swagger UI em
 
 ## 12. Como simular uma mensagem do WhatsApp
 
+Com a aplicação no ar, abra `http://localhost:8080/simulator` para usar a
+interface visual de conversa. Ela permite trocar o telefone simulado, iniciar
+novas sessões, acompanhar o estado da triagem e testar cenários de informação,
+preço e reclamação. O atalho **Simulador** também está disponível no menu do
+dashboard.
+
 Enquanto a integração real não está configurada (seção 13), o endpoint
 `POST /api/v1/webhook/whatsapp` simula exatamente esse recebimento:
 
@@ -358,6 +364,8 @@ de responsabilidades".
   triagens, ordenada por prioridade e interação mais recente.
 * Interface web responsiva para acompanhar indicadores, filtrar triagens e
   operar a fila de atendimento humano.
+* Simulador visual de conversa integrado ao webhook local, com histórico,
+  estado da triagem e cenários rápidos de teste.
 * Respostas opcionais por IA após a triagem, com prompt restritivo, timeout
   e fallback automático para o comportamento local.
 * Encerramento automático e configurável de conversas do bot após
