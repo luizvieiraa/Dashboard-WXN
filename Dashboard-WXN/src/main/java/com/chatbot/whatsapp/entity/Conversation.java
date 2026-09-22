@@ -25,12 +25,8 @@ import org.hibernate.annotations.CreationTimestamp;
  * Representa uma sessao de conversa entre um {@link Customer} e o chatbot.
  *
  * <p>Uma conversa agrupa uma sequencia de mensagens (inbound e outbound) e
- * mantem um pequeno "contexto" textual simples, que a camada de
- * processamento pode usar para lembrar o ultimo assunto tratado. Este campo
- * e propositalmente simples (texto livre) nesta primeira versao; uma
- * maquina de estados mais rica fica marcada como PENDENTE DE DEFINICAO COM
- * O CLIENTE, pois depende das regras de negocio reais que ainda serao
- * definidas.</p>
+ * mantem o estado do atendimento e um pequeno contexto textual que a camada
+ * de processamento pode usar para lembrar o ultimo assunto tratado.</p>
  */
 @Entity
 @Table(name = "conversations")
@@ -50,7 +46,7 @@ public class Conversation {
     private Customer customer;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = false, length = 30)
     private ConversationStatus status;
 
     @Enumerated(EnumType.STRING)

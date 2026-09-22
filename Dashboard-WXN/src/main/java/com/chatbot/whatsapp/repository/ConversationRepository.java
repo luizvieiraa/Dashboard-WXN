@@ -9,7 +9,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
-    Optional<Conversation> findFirstByCustomerAndStatusOrderByStartedAtDesc(Customer customer, ConversationStatus status);
+    Optional<Conversation> findFirstByCustomerAndStatusNotOrderByStartedAtDesc(
+            Customer customer,
+            ConversationStatus excludedStatus);
 
     @EntityGraph(attributePaths = "customer")
     Optional<Conversation> findOneById(Long id);

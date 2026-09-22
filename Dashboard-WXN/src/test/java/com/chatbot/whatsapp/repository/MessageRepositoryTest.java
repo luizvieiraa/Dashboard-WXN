@@ -37,7 +37,7 @@ class MessageRepositoryTest {
         Conversation conversation = entityManager.persistAndFlush(
                 Conversation.builder()
                         .customer(customer)
-                        .status(ConversationStatus.OPEN)
+                        .status(ConversationStatus.BOT_ACTIVE)
                         .channel(ChannelType.WHATSAPP)
                         .lastInteractionAt(Instant.now())
                         .build());

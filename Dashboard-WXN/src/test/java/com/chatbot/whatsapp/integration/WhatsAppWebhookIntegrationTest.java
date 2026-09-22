@@ -57,6 +57,7 @@ class WhatsAppWebhookIntegrationTest {
         mockMvc.perform(get("/api/v1/conversations/{id}", conversationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.customerPhone", is("5511988887777")))
+                .andExpect(jsonPath("$.status", is("BOT_ACTIVE")))
                 .andExpect(jsonPath("$.messages.length()", is(2)));
 
         mockMvc.perform(get("/api/v1/conversations/{id}/messages", conversationId))

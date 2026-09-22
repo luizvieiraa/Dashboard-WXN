@@ -80,7 +80,7 @@ Consulta uma conversa e todas as suas mensagens, em ordem cronológica.
 {
   "id": 1,
   "customerPhone": "5511999999999",
-  "status": "OPEN",
+  "status": "BOT_ACTIVE",
   "channel": "WHATSAPP",
   "context": "PRICE_INQUIRY",
   "startedAt": "2026-09-09T12:00:00Z",

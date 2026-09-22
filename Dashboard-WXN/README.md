@@ -106,8 +106,9 @@ src/main/java/com/chatbot/whatsapp/
 
 ## 6. Banco de dados
 
-Três entidades: `Customer`, `Conversation`, `Message` (relacionamento
-`1:N:N`). Justificativa de cada uma, atributos, relacionamentos e como as
+Quatro entidades: `Customer`, `Conversation`, `Message` e `Triage`. A triagem
+organiza os dados que serão consumidos pelo futuro dashboard. Justificativa
+de cada entidade, atributos, relacionamentos e como as
 migrations Flyway funcionam: [`docs/DATABASE.md`](docs/DATABASE.md).
 
 ## 7. API
@@ -328,7 +329,7 @@ de responsabilidades".
 
 * API REST com endpoints de health check, webhook (simulado) e consulta
   de conversas/mensagens.
-* Modelo de dados (`Customer`, `Conversation`, `Message`) com migrations
+* Modelo de dados (`Customer`, `Conversation`, `Message`, `Triage`) com migrations
   Flyway.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.

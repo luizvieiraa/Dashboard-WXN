@@ -53,7 +53,7 @@ public class MessageProcessingService {
     @Transactional
     public WhatsAppWebhookResponse process(WhatsAppWebhookRequest request) {
         Customer customer = customerService.findOrCreateByPhone(request.phone());
-        Conversation conversation = conversationService.getOrCreateOpenConversation(customer);
+        Conversation conversation = conversationService.getOrCreateActiveConversation(customer);
 
         Message inboundMessage = messageService.recordInbound(conversation, request.message());
 

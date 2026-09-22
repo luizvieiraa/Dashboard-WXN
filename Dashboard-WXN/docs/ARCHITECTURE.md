@@ -64,7 +64,7 @@ regra dentro do Controller" é resolvido colocando a orquestração em
    (`@Valid`) e delega para `MessageProcessingService`.
 2. `MessageProcessingService` (a orquestração):
    1. busca ou cria o `Customer` pelo telefone (`CustomerService`);
-   2. busca a conversa aberta do cliente ou cria uma nova (`ConversationService`);
+   2. busca a conversa ativa do cliente ou cria uma nova (`ConversationService`);
    3. grava a mensagem recebida (`MessageService.recordInbound`);
    4. classifica a intenção do texto (`IntentClassifier`);
    5. gera a resposta do bot para aquela intenção (`ChatbotResponseService`);

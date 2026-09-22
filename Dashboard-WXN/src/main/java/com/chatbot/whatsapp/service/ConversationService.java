@@ -20,8 +20,8 @@ public class ConversationService {
     }
 
     /**
-     * Retorna a conversa aberta mais recente do cliente, ou cria uma nova
-     * caso nao exista nenhuma em aberto. Isso evita criar uma conversa nova
+     * Retorna a conversa ativa mais recente do cliente, ou cria uma nova
+     * caso todas estejam encerradas. Isso evita criar uma conversa nova
      * a cada mensagem, mantendo o historico agrupado enquanto o cliente
      * estiver "no meio" de um atendimento.
      *
@@ -30,13 +30,13 @@ public class ConversationService {
      * negocio - PENDENTE DE DEFINICAO COM O CLIENTE.</p>
      */
     @Transactional
-    public Conversation getOrCreateOpenConversation(Customer customer) {
+    public Conversation getOrCreateActiveConversation(Customer customer) {
         return conversationRepository
-                .findFirstByCustomerAndStatusOrderByStartedAtDesc(customer, ConversationStatus.OPEN)
+                .findFirstByCustomerAndStatusNotOrderByStartedAtDesc(customer, ConversationStatus.CLOSED)
                 .orElseGet(() -> conversationRepository.save(
                         Conversation.builder()
                                 .customer(customer)
-                                .status(ConversationStatus.OPEN)
+                                .status(ConversationStatus.BOT_ACTIVE)
                                 .channel(ChannelType.WHATSAPP)
                                 .lastInteractionAt(Instant.now())
                                 .build()));
