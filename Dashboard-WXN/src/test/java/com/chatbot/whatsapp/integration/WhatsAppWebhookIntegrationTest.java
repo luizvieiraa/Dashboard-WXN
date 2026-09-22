@@ -8,7 +8,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.chatbot.whatsapp.entity.Customer;
+import com.chatbot.whatsapp.entity.Triage;
+import com.chatbot.whatsapp.entity.enums.TriageCategory;
+import com.chatbot.whatsapp.repository.CustomerRepository;
+import com.chatbot.whatsapp.repository.TriageRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -33,6 +40,12 @@ class WhatsAppWebhookIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private TriageRepository triageRepository;
+
     @Test
     void deveReceberMensagemProcessarEPersistirConversa() throws Exception {
         String payload = """
@@ -49,7 +62,7 @@ class WhatsAppWebhookIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.conversationId", notNullValue()))
                 .andExpect(jsonPath("$.customerPhone", is("5511988887777")))
-                .andExpect(jsonPath("$.botReply", is("Claro. Vou verificar o preço solicitado e já te retorno.")))
+                .andExpect(jsonPath("$.botReply", is("Para começar, qual é o seu nome?")))
                 .andReturn().getResponse().getContentAsString();
 
         Long conversationId = objectMapper.readTree(responseJson).get("conversationId").asLong();
@@ -57,13 +70,55 @@ class WhatsAppWebhookIntegrationTest {
         mockMvc.perform(get("/api/v1/conversations/{id}", conversationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.customerPhone", is("5511988887777")))
-                .andExpect(jsonPath("$.status", is("BOT_ACTIVE")))
+                .andExpect(jsonPath("$.status", is("COLLECTING_INFORMATION")))
                 .andExpect(jsonPath("$.messages.length()", is(2)));
 
         mockMvc.perform(get("/api/v1/conversations/{id}/messages", conversationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].direction", is("INBOUND")))
                 .andExpect(jsonPath("$[1].direction", is("OUTBOUND")));
+    }
+
+    @Test
+    void deveColetarInformacoesEConcluirTriagem() throws Exception {
+        String phone = "5511970000001";
+
+        JsonNode firstResponse = sendMessage(phone, "Quero contratar um chatbot");
+        long conversationId = firstResponse.get("conversationId").asLong();
+        org.assertj.core.api.Assertions.assertThat(firstResponse.get("botReply").asText())
+                .isEqualTo("Para começar, qual é o seu nome?");
+
+        JsonNode nameResponse = sendMessage(phone, "  Maria   Silva  ");
+        org.assertj.core.api.Assertions.assertThat(nameResponse.get("botReply").asText())
+                .isEqualTo("Obrigado, Maria Silva. Qual é o nome da sua empresa?");
+
+        JsonNode companyResponse = sendMessage(phone, "Empresa Exemplo");
+        org.assertj.core.api.Assertions.assertThat(companyResponse.get("botReply").asText())
+                .isEqualTo("Certo. Qual assunto ou informação você procura?");
+
+        JsonNode subjectResponse = sendMessage(phone, "Automatizar a prospecção comercial");
+        org.assertj.core.api.Assertions.assertThat(subjectResponse.get("botReply").asText())
+                .isEqualTo("Obrigado! Registrei suas informações e concluímos a triagem inicial.");
+
+        mockMvc.perform(get("/api/v1/conversations/{id}", conversationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("QUALIFIED")))
+                .andExpect(jsonPath("$.context", is("TRIAGE_COMPLETED")))
+                .andExpect(jsonPath("$.messages.length()", is(8)));
+
+        Customer customer = customerRepository.findByPhoneNumber(phone).orElseThrow();
+        Triage triage = triageRepository.findByConversationId(conversationId).orElseThrow();
+
+        org.assertj.core.api.Assertions.assertThat(customer.getName()).isEqualTo("Maria Silva");
+        org.assertj.core.api.Assertions.assertThat(customer.getCompanyName()).isEqualTo("Empresa Exemplo");
+        org.assertj.core.api.Assertions.assertThat(triage.getCategory()).isEqualTo(TriageCategory.INFORMATION);
+        org.assertj.core.api.Assertions.assertThat(triage.getSubject())
+                .isEqualTo("Automatizar a prospecção comercial");
+        org.assertj.core.api.Assertions.assertThat(triage.getCustomerNeed())
+                .isEqualTo("Quero contratar um chatbot");
+        org.assertj.core.api.Assertions.assertThat(triage.getMissingInformation()).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(triage.getSummary())
+                .contains("Maria Silva", "Empresa Exemplo", "Automatizar a prospecção comercial");
     }
 
     @Test
@@ -113,5 +168,22 @@ class WhatsAppWebhookIntegrationTest {
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("mensagem"))
                 .andExpect(status().isUnsupportedMediaType());
+    }
+
+    private JsonNode sendMessage(String phone, String message) throws Exception {
+        String payload = objectMapper.writeValueAsString(Map.of(
+                "phone", phone,
+                "message", message
+        ));
+
+        String response = mockMvc.perform(post("/api/v1/webhook/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return objectMapper.readTree(response);
     }
 }

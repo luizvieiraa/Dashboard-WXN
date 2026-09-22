@@ -1,6 +1,7 @@
 package com.chatbot.whatsapp.entity;
 
 import com.chatbot.whatsapp.entity.enums.TriageCategory;
+import com.chatbot.whatsapp.entity.enums.TriageField;
 import com.chatbot.whatsapp.entity.enums.TriagePriority;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -72,8 +73,9 @@ public class Triage {
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "triage_missing_information", joinColumns = @JoinColumn(name = "triage_id"))
+    @Enumerated(EnumType.STRING)
     @Column(name = "field_name", nullable = false, length = 100)
-    private Set<String> missingInformation = new LinkedHashSet<>();
+    private Set<TriageField> missingInformation = new LinkedHashSet<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

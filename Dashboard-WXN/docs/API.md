@@ -36,6 +36,10 @@ README, seção "Integração real com WhatsApp"): aceita o mesmo tipo de
 informação que chegaria de um provedor real, permitindo testar todo o
 fluxo antes de uma integração real estar configurada.
 
+Na primeira conversa de um cliente, o bot inicia uma coleta guiada. A
+mensagem inicial é registrada como necessidade, e as mensagens seguintes
+preenchem nome, empresa e assunto, uma informação por vez.
+
 * **Body** (`application/json`):
 
 | Campo | Tipo | Obrigatório | Descrição |
@@ -59,10 +63,14 @@ fluxo antes de uma integração real estar configurada.
   "conversationId": 1,
   "customerPhone": "5511999999999",
   "receivedMessage": "Olá, gostaria de saber o preço de um produto",
-  "botReply": "Claro. Vou verificar o preço solicitado e já te retorno.",
+  "botReply": "Para começar, qual é o seu nome?",
   "processedAt": "2026-09-09T12:00:01Z"
 }
 ```
+
+Mantendo o mesmo `phone`, as próximas respostas devem informar, nesta
+ordem: nome, empresa e assunto. Ao final, a conversa passa para
+`QUALIFIED` e a triagem recebe um resumo.
 
 * **Erros**:
   * `400 Bad Request` - `phone` ou `message` ausentes/inválidos (corpo no formato padrão de erro, ver abaixo).

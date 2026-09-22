@@ -32,7 +32,8 @@ com.chatbot.whatsapp
 ├── ChatbotApplication.java     # ponto de entrada (main)
 ├── controller/                 # camada web: recebe HTTP, valida, delega ao service, define status code
 ├── service/                    # regras de negócio e orquestração
-│   └── chatbot/                # classificação de intenção e geração de resposta do bot
+│   ├── chatbot/                # classificação de intenção e geração de resposta do bot
+│   └── triage/                 # coleta guiada e estruturação da triagem
 ├── repository/                 # interfaces Spring Data JPA (acesso a dados)
 ├── entity/                     # entidades JPA (mapeiam as tabelas do banco)
 │   └── enums/                  # enums de domínio (status, direção, canal)
@@ -66,11 +67,14 @@ regra dentro do Controller" é resolvido colocando a orquestração em
    1. busca ou cria o `Customer` pelo telefone (`CustomerService`);
    2. busca a conversa ativa do cliente ou cria uma nova (`ConversationService`);
    3. grava a mensagem recebida (`MessageService.recordInbound`);
-   4. classifica a intenção do texto (`IntentClassifier`);
-   5. gera a resposta do bot para aquela intenção (`ChatbotResponseService`);
-   6. marca a mensagem recebida como processada e grava a mensagem de resposta;
-   7. atualiza o "contexto" e o horário da última interação da conversa;
-   8. envia a resposta ao cliente via `WhatsAppClient` (hoje, um mock que
+   4. inicia ou continua a coleta de nome, empresa e assunto
+      (`InformationCollectionService`);
+   5. quando a coleta já terminou, classifica a intenção do texto e usa a
+      resposta do chatbot atual;
+   6. ao completar os campos, gera um resumo e marca a conversa como `QUALIFIED`;
+   7. marca a mensagem recebida como processada e grava a mensagem de resposta;
+   8. atualiza o "contexto" e o horário da última interação da conversa;
+   9. envia a resposta ao cliente via `WhatsAppClient` (hoje, um mock que
       apenas loga a mensagem - ver `docs/DEVELOPMENT.md` e o README).
 3. O controller devolve `201 Created` com um resumo do que foi processado.
 

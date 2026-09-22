@@ -101,6 +101,7 @@ conversa pode possuir no máximo uma triagem.
 
 Os campos que ainda precisam ser coletados ficam em
 `triage_missing_information`, relacionados à triagem por `triage_id`.
+Os valores atuais são `CUSTOMER_NAME`, `COMPANY_NAME` e `SUBJECT`.
 
 ## Relacionamentos
 

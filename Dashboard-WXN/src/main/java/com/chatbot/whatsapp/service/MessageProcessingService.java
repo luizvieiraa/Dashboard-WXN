@@ -10,7 +10,10 @@ import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
 import com.chatbot.whatsapp.service.chatbot.ChatIntent;
 import com.chatbot.whatsapp.service.chatbot.ChatbotResponseService;
 import com.chatbot.whatsapp.service.chatbot.IntentClassifier;
+import com.chatbot.whatsapp.service.triage.InformationCollectionService;
+import com.chatbot.whatsapp.service.triage.TriageCollectionResult;
 import java.time.Instant;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,7 @@ public class MessageProcessingService {
     private final CustomerService customerService;
     private final ConversationService conversationService;
     private final MessageService messageService;
+    private final InformationCollectionService informationCollectionService;
     private final IntentClassifier intentClassifier;
     private final ChatbotResponseService chatbotResponseService;
     private final WhatsAppClient whatsAppClient;
@@ -39,12 +43,14 @@ public class MessageProcessingService {
     public MessageProcessingService(CustomerService customerService,
                                      ConversationService conversationService,
                                      MessageService messageService,
+                                     InformationCollectionService informationCollectionService,
                                      IntentClassifier intentClassifier,
                                      ChatbotResponseService chatbotResponseService,
                                      WhatsAppClient whatsAppClient) {
         this.customerService = customerService;
         this.conversationService = conversationService;
         this.messageService = messageService;
+        this.informationCollectionService = informationCollectionService;
         this.intentClassifier = intentClassifier;
         this.chatbotResponseService = chatbotResponseService;
         this.whatsAppClient = whatsAppClient;
@@ -57,12 +63,27 @@ public class MessageProcessingService {
 
         Message inboundMessage = messageService.recordInbound(conversation, request.message());
 
-        ChatIntent intent = intentClassifier.classify(request.message());
-        String reply = chatbotResponseService.generateReply(intent);
+        Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
+                conversation,
+                customer,
+                request.message()
+        );
+
+        String reply;
+        String context;
+        if (collectionResult.isPresent()) {
+            TriageCollectionResult result = collectionResult.get();
+            reply = result.reply();
+            context = result.context();
+        } else {
+            ChatIntent intent = intentClassifier.classify(request.message());
+            reply = chatbotResponseService.generateReply(intent);
+            context = intent.name();
+        }
 
         messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
         messageService.recordOutbound(conversation, reply, MessageStatus.SENT);
-        conversationService.touch(conversation, intent.name());
+        conversationService.touch(conversation, context);
 
         whatsAppClient.sendMessage(customer.getPhoneNumber(), reply);
 

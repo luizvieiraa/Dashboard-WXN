@@ -29,7 +29,7 @@ Webhook  (POST /api/v1/webhook/whatsapp - hoje simulado, ver seção 13)
 API Spring Boot (Controller)
   │
   ▼
-Processamento (Service: identifica o cliente/conversa, classifica a intenção da mensagem)
+Processamento (Service: identifica o cliente/conversa e conduz a coleta da triagem)
   │
   ▼
 Banco de Dados (PostgreSQL: histórico de clientes, conversas e mensagens)
@@ -95,7 +95,7 @@ pacotes e o porquê de cada decisão em [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 ```
 src/main/java/com/chatbot/whatsapp/
 ├── controller/      # endpoints REST
-├── service/         # regras de negócio (+ subpacote chatbot: intenção/resposta)
+├── service/         # regras de negócio (+ subpacotes chatbot e triage)
 ├── repository/      # Spring Data JPA
 ├── entity/          # entidades JPA (+ subpacote enums)
 ├── dto/             # request/ e response/
@@ -331,6 +331,8 @@ de responsabilidades".
   de conversas/mensagens.
 * Modelo de dados (`Customer`, `Conversation`, `Message`, `Triage`) com migrations
   Flyway.
+* Coleta guiada de nome, empresa e assunto, com resumo persistido ao final
+  da triagem.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.

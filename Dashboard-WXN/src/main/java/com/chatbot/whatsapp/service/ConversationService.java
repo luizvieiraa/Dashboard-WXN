@@ -54,4 +54,10 @@ public class ConversationService {
         conversation.setContext(lastContext);
         conversationRepository.save(conversation);
     }
+
+    @Transactional
+    public void changeStatus(Conversation conversation, ConversationStatus status) {
+        conversation.setStatus(status);
+        conversationRepository.save(conversation);
+    }
 }

@@ -8,6 +8,7 @@ import com.chatbot.whatsapp.entity.Triage;
 import com.chatbot.whatsapp.entity.enums.ChannelType;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.entity.enums.TriageCategory;
+import com.chatbot.whatsapp.entity.enums.TriageField;
 import com.chatbot.whatsapp.entity.enums.TriagePriority;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -57,7 +58,7 @@ class TriageRepositoryTest {
                         .subject("Contratacao de chatbot")
                         .customerNeed("Automatizar a triagem comercial")
                         .summary("Cliente busca um chatbot para qualificacao de leads.")
-                        .missingInformation(new LinkedHashSet<>(Set.of("monthlyVolume")))
+                        .missingInformation(new LinkedHashSet<>(Set.of(TriageField.SUBJECT)))
                         .build());
 
         entityManager.clear();
@@ -68,6 +69,6 @@ class TriageRepositoryTest {
         assertThat(persisted.getCategory()).isEqualTo(TriageCategory.INFORMATION);
         assertThat(persisted.getPriority()).isEqualTo(TriagePriority.MEDIUM);
         assertThat(persisted.isRequiresHuman()).isFalse();
-        assertThat(persisted.getMissingInformation()).containsExactly("monthlyVolume");
+        assertThat(persisted.getMissingInformation()).containsExactly(TriageField.SUBJECT);
     }
 }
