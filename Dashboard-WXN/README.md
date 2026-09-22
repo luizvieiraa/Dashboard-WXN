@@ -16,6 +16,17 @@ histórico completo e consultável de cada conversa.
 
 ## 3. Funcionamento
 
+O backend é o núcleo da aplicação e recebe mensagens por **dois canais**,
+que compartilham exatamente a mesma lógica de chatbot:
+
+```
+                  ┌──▶ Simulador web (/simulator)
+CHATBOT ◀── BACKEND
+                  └──▶ WhatsApp (Meta Cloud API)
+```
+
+Fluxo do canal WhatsApp, de ponta a ponta:
+
 ```
 Cliente
   │
@@ -23,13 +34,16 @@ Cliente
 WhatsApp
   │
   ▼
-Webhook  (POST /api/v1/webhook/whatsapp - hoje simulado, ver seção 13)
+Meta Cloud API
   │
   ▼
-API Spring Boot (Controller)
+Webhook  (POST /api/v1/webhook/whatsapp/meta - valida a assinatura da Meta)
   │
   ▼
-Processamento (Service: identifica o cliente/conversa e conduz a coleta da triagem)
+API Spring Boot (Controller -> Parser -> WhatsAppInboundService)
+  │
+  ▼
+Processamento (MessageProcessingService: identifica o cliente/conversa e conduz a coleta da triagem)
   │
   ▼
 Banco de Dados (PostgreSQL: histórico de clientes, conversas e mensagens)
@@ -38,11 +52,18 @@ Banco de Dados (PostgreSQL: histórico de clientes, conversas e mensagens)
 Resposta (gerada pelo chatbot)
   │
   ▼
+Meta Cloud API  (POST /{versão}/{phone-number-id}/messages)
+  │
+  ▼
 WhatsApp
   │
   ▼
 Cliente
 ```
+
+O canal do simulador entra no mesmo `MessageProcessingService` a partir do
+`POST /api/v1/webhook/whatsapp`, sem passar pela Meta. Para colocar o
+WhatsApp real no ar, ver a **seção 13**.
 
 Detalhamento completo do fluxo em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -123,7 +144,9 @@ Resumo dos endpoints:
 | Método | Rota | Finalidade |
 |---|---|---|
 | GET | `/api/v1/health` | Health check da aplicação |
-| POST | `/api/v1/webhook/whatsapp` | Recebe uma mensagem do cliente (simulação do webhook do WhatsApp) e devolve a resposta do chatbot |
+| POST | `/api/v1/webhook/whatsapp` | Recebe uma mensagem em formato simplificado (usado pelo simulador) e devolve a resposta do chatbot |
+| GET | `/api/v1/webhook/whatsapp/meta` | Handshake de verificação do webhook da Meta |
+| POST | `/api/v1/webhook/whatsapp/meta` | **Webhook real da WhatsApp Cloud API**: recebe as mensagens enviadas pelos usuários no WhatsApp |
 | GET | `/api/v1/conversations/{id}` | Consulta uma conversa e suas mensagens |
 | GET | `/api/v1/conversations/{id}/messages` | Lista as mensagens de uma conversa |
 | POST | `/api/v1/conversations/{id}/human/claim` | Atendente assume uma conversa encaminhada |
@@ -201,6 +224,13 @@ processamento → persistência → resposta), classificação de intenção,
 geração de resposta do bot e o repository de mensagens. Detalhes em
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
+Para o canal WhatsApp, cobrem também: o handshake de verificação, a
+validação da assinatura `X-Hub-Signature-256`, o parsing do envelope da
+Meta, a deduplicação de reentregas, o formato da chamada de envio e a
+seleção do `WhatsAppClient` por configuração. A comunicação com os
+servidores da Meta é simulada (`MockRestServiceServer`) - o que depende de
+configuração externa está na seção 13.7.
+
 ## 11. Como testar a API
 
 Com a aplicação rodando (local ou via Docker), usando `curl`:
@@ -221,6 +251,25 @@ curl http://localhost:8080/api/v1/conversations/1
 curl http://localhost:8080/api/v1/conversations/1/messages
 ```
 
+Para testar o **webhook real da Meta** sem a Meta, envie um envelope no
+formato dela (útil para validar a integração antes de expor a URL; funciona
+enquanto `WHATSAPP_APP_SECRET` estiver vazio, pois aí a assinatura não é
+exigida):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/webhook/whatsapp/meta \
+  -H "Content-Type: application/json" \
+  -d '{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages",
+       "value":{"messaging_product":"whatsapp",
+       "contacts":[{"profile":{"name":"Teste"},"wa_id":"5511999999999"}],
+       "messages":[{"from":"5511999999999","id":"wamid.TESTE1","timestamp":"1749416383",
+       "type":"text","text":{"body":"Olá"}}]}}]}]}'
+```
+
+A resposta HTTP é `200` com corpo vazio - a resposta do chatbot vai para o
+log (com `WHATSAPP_ENABLED=false`) ou para o WhatsApp (com `true`). Consulte
+a conversa criada com `curl http://localhost:8080/api/v1/conversations/1`.
+
 Ou importe a URL base `http://localhost:8080` no Postman/Insomnia e use os
 mesmos métodos/rotas/bodies descritos em [`docs/API.md`](docs/API.md).
 Também é possível testar diretamente pelo Swagger UI em
@@ -228,14 +277,18 @@ Também é possível testar diretamente pelo Swagger UI em
 
 ## 12. Como simular uma mensagem do WhatsApp
 
+Este é o canal de testes local, que **continua funcionando** depois da
+integração real (seção 13) - os dois convivem. Ele é a forma mais rápida de
+exercitar o chatbot sem depender da Meta.
+
 Com a aplicação no ar, abra `http://localhost:8080/simulator` para usar a
 interface visual de conversa. Ela permite trocar o telefone simulado, iniciar
 novas sessões, acompanhar o estado da triagem e testar cenários de informação,
 preço e reclamação. O atalho **Simulador** também está disponível no menu do
 dashboard.
 
-Enquanto a integração real não está configurada (seção 13), o endpoint
-`POST /api/v1/webhook/whatsapp` simula exatamente esse recebimento:
+Por baixo, o simulador usa o endpoint
+`POST /api/v1/webhook/whatsapp`, com um payload simplificado:
 
 ```json
 {
@@ -249,52 +302,161 @@ Enquanto a integração real não está configurada (seção 13), o endpoint
 Processamento → Banco → Resposta) roda exatamente como rodaria com uma
 mensagem real do WhatsApp - a única diferença é a origem da chamada HTTP.
 
+> Atenção: com `WHATSAPP_ENABLED=true`, a resposta gerada aqui é entregue
+> de verdade, pelo WhatsApp, ao número digitado no simulador. Use
+> `WHATSAPP_ENABLED=false` para testar sem enviar nada.
+
 ## 13. Integração real com WhatsApp
 
-**PENDENTE DE DEFINIÇÃO COM O CLIENTE**: qual provedor será usado (Meta
-WhatsApp Cloud API, Twilio, 360dialog, etc.) - isso muda credenciais e
-alguns detalhes do payload do webhook.
+A integração é implementada com a **WhatsApp Business Platform (Cloud API)
+da Meta**, a API oficial. Escolhemos ela em vez de intermediários (Twilio,
+360dialog) por ser *first-party* - sem custo de revenda e sem depender de um
+terceiro - e em vez de bibliotecas como `whatsapp-web.js`/Baileys, que
+automatizam o WhatsApp Web, violam os Termos de Uso e quebram a cada
+atualização do app.
 
-O que já está preparado:
+O código está pronto e testado. **Falta apenas a configuração externa
+descrita abaixo** - nada disso pode ser feito por código.
 
-* Uma camada de integração isolada (`integration/whatsapp`), com uma
-  interface (`WhatsAppClient`) que a regra de negócio usa para *enviar*
-  respostas, e uma implementação mock (`MockWhatsAppSender`) que apenas
-  loga a mensagem que seria enviada - assim o sistema inteiro já funciona
-  de ponta a ponta sem depender de credenciais externas.
-* Um endpoint de webhook (`POST /api/v1/webhook/whatsapp`) já no formato
-  que uma integração real usaria para *receber* mensagens.
-* Configuração via variáveis de ambiente (`WhatsAppProperties`), nunca
-  hardcoded.
+### 13.1. O que já está implementado
 
-O que falta configurar quando o provedor for escolhido:
+| Componente | Responsabilidade |
+|---|---|
+| `MetaWebhookController` | `GET` de verificação + `POST` de recebimento em `/api/v1/webhook/whatsapp/meta` |
+| `WhatsAppSignatureVerifier` | Valida a assinatura `X-Hub-Signature-256` de cada notificação |
+| `MetaWebhookPayloadParser` | Traduz o envelope da Meta em mensagens de domínio |
+| `WhatsAppInboundService` | Deduplica reentregas e encaminha ao chatbot existente |
+| `MetaWhatsAppClient` | Envia a resposta via `POST /{versão}/{phone-number-id}/messages` |
 
-1. Criar uma nova implementação de `WhatsAppClient` (ex.: `MetaWhatsAppClient`)
-   que efetivamente chame a API do provedor.
-2. Validar/adaptar o formato do payload que o provedor realmente envia no
-   webhook (pode não ser idêntico ao `WhatsAppWebhookRequest` atual - se
-   necessário, um DTO/conversor específico do provedor é adicionado nessa
-   mesma camada, sem alterar o resto do sistema).
-3. Implementar o handshake de verificação do webhook, se o provedor exigir
-   (ex.: Meta exige responder a um `GET` de verificação usando um
-   `verify_token`) - o campo `webhook-verify-token` já existe em
-   `WhatsAppProperties` para isso.
-4. Definir e preencher as variáveis de ambiente reais (nomes já reservados
-   em `.env.example`):
+O chatbot **não foi duplicado**: as mensagens do WhatsApp entram no mesmo
+`MessageProcessingService` que o simulador usa, então triagem, detecção de
+reclamação, respostas por IA, fila de atendimento humano e encerramento por
+inatividade funcionam igual nos dois canais. Detalhes em
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), seção "Canal WhatsApp".
+
+### 13.2. Passo a passo na Meta
+
+1. **Crie uma conta de desenvolvedor** em
+   [developers.facebook.com](https://developers.facebook.com) e um **app**
+   do tipo *Business*.
+2. No app, adicione o produto **WhatsApp**. A Meta cria automaticamente uma
+   *WhatsApp Business Account* e um **número de teste** - suficiente para
+   validar a integração, sem precisar de um número próprio.
+3. Em **WhatsApp > API Setup**, anote:
+   * **Phone number ID** → `WHATSAPP_PHONE_NUMBER_ID`
+     (é um id numérico, *não* o número de telefone)
+   * **Temporary access token** → `WHATSAPP_ACCESS_TOKEN`
+     (expira em 24h; ver 13.5 para um token permanente)
+4. Ainda em **API Setup**, na seção *To*, **cadastre o seu número pessoal
+   de WhatsApp** como destinatário de teste e confirme o código recebido.
+   O número de teste da Meta só conversa com números nessa lista.
+5. Em **App settings > Basic**, copie o **App secret** →
+   `WHATSAPP_APP_SECRET`.
+6. Escolha um **verify token**: qualquer string secreta inventada por você
+   (ex.: gere com `openssl rand -hex 16`) → `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+   Ela só serve para o handshake do passo 8.
+
+### 13.3. Expor o backend em uma URL pública
+
+A Meta precisa alcançar seu servidor, então `localhost` não funciona. Para
+desenvolvimento, use um túnel:
+
+```bash
+# Em um terminal, com a aplicação rodando na porta 8080:
+ngrok http 8080
+# Anote a URL https gerada, ex.: https://abc123.ngrok-free.app
+```
+
+Em produção, use a URL pública do deploy (ver seção 15).
+
+### 13.4. Cadastrar o webhook
+
+1. Suba a aplicação já com as variáveis preenchidas (seção 13.6) -
+   inclusive `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, senão a verificação falha
+   com `403`.
+2. No painel do app, vá em **WhatsApp > Configuration > Webhook** e clique
+   em **Edit**:
+   * **Callback URL**:
+     `https://SUA-URL-PUBLICA/api/v1/webhook/whatsapp/meta`
+   * **Verify token**: exatamente o valor de
+     `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+3. Clique em **Verify and save**. A Meta faz um `GET` no endpoint; se o
+   token conferir, o backend devolve o `hub.challenge` e o cadastro é
+   aceito. Nos logs aparece:
+   `Webhook do WhatsApp verificado com sucesso pela Meta`.
+4. Em **Webhook fields**, clique em **Manage** e **inscreva-se no campo
+   `messages`**. Sem essa inscrição o webhook é aceito, mas nenhuma
+   mensagem é entregue - é o esquecimento mais comum nessa configuração.
+
+### 13.5. Token permanente (para uso contínuo)
+
+O token temporário expira em 24 horas. Para um ambiente que fica no ar:
+
+1. Em **business.facebook.com > Configurações do negócio > Usuários >
+   Usuários do sistema**, crie um *System User* com papel de **Admin**.
+2. Clique em **Adicionar ativos** e dê a ele acesso ao app e à WhatsApp
+   Business Account.
+3. Clique em **Gerar novo token**, selecione o app e as permissões
+   `whatsapp_business_messaging` e `whatsapp_business_management`.
+4. Use esse token em `WHATSAPP_ACCESS_TOKEN`.
+
+### 13.6. Variáveis de ambiente
+
+```
+WHATSAPP_ENABLED=true
+WHATSAPP_API_URL=https://graph.facebook.com
+WHATSAPP_API_VERSION=v21.0
+WHATSAPP_ACCESS_TOKEN=<token de acesso da Cloud API>
+WHATSAPP_PHONE_NUMBER_ID=<Phone number ID>
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=<string secreta inventada por você>
+WHATSAPP_APP_SECRET=<App secret do app da Meta>
+```
+
+Essas credenciais devem ser guardadas como *secrets* da plataforma de
+deploy (ver seção 15) - **nunca** commitadas no repositório. Com
+`WHATSAPP_ENABLED=false` (padrão) o sistema roda inteiro sem nenhuma delas.
+
+### 13.7. Como testar de verdade
+
+1. Envie uma mensagem do seu WhatsApp pessoal para o número de teste da
+   Meta (o número aparece em **API Setup**).
+2. Acompanhe os logs da aplicação. O caminho esperado é:
 
    ```
-   WHATSAPP_ENABLED=true
-   WHATSAPP_API_URL=<url da API do provedor>
-   WHATSAPP_ACCESS_TOKEN=<token de acesso>
-   WHATSAPP_PHONE_NUMBER_ID=<id do número remetente>
-   WHATSAPP_WEBHOOK_VERIFY_TOKEN=<token de verificação do webhook>
+   Notificacao do webhook: 1 mensagem(ns) recebida(s), 1 processada(s)
+   Mensagem wamid.XXX processada na conversa 1
+   Mensagem enviada ao WhatsApp de 55... (id do provedor: wamid.YYY)
    ```
 
-   Essas credenciais devem ser guardadas como *secrets* da plataforma de
-   deploy (ver seção 15) - nunca commitadas no repositório.
-5. Testar localmente com uma ferramenta de túnel (ex.: `ngrok`) apontando
-   para `localhost:8080/api/v1/webhook/whatsapp`, já que o provedor real
-   precisa de uma URL pública para enviar o webhook.
+3. Você deve receber a resposta do chatbot no WhatsApp - na primeira
+   mensagem, o início da triagem ("como posso te chamar?").
+4. Confirme a persistência abrindo o dashboard em
+   `https://SUA-URL/dashboard`, ou via API:
+   `curl https://SUA-URL/api/v1/conversations/1`.
+5. Responda no WhatsApp com nome, empresa e assunto para percorrer a
+   triagem completa; envie uma reclamação para ver a conversa cair na fila
+   de atendimento humano do dashboard.
+
+### 13.8. Limitações conhecidas
+
+* **Janela de 24 horas**: a Cloud API só permite mensagem de texto livre
+  dentro de 24h após a última mensagem do usuário. Fora dela, a Meta exige
+  um *template* previamente aprovado - **não implementado**. Na prática
+  isso não afeta o chatbot, que sempre responde a uma mensagem recebida.
+* **Somente texto**: mídias (imagem, áudio, documento, localização) recebem
+  um aviso pedindo que o cliente escreva em texto, e não são registradas -
+  isso evita contaminar a coleta da triagem com conteúdo não textual.
+* **Número de teste**: só conversa com os números cadastrados na lista de
+  destinatários. Para atender qualquer pessoa é preciso registrar um número
+  próprio e passar pela verificação do negócio na Meta.
+* **Processamento sincrônico**: o `200` para a Meta só volta depois de
+  processar e enviar a resposta. Adequado ao volume atual; ver
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para a discussão.
+* **O simulador compartilha o `WhatsAppClient`**: com
+  `WHATSAPP_ENABLED=true`, uma mensagem enviada pelo `/simulator` faz o
+  backend tentar entregar a resposta de verdade, pelo WhatsApp, ao número
+  digitado no simulador. Para testar sem enviar nada, use
+  `WHATSAPP_ENABLED=false`.
 
 ## 14. Variáveis de ambiente
 
@@ -308,11 +470,13 @@ Todas documentadas em [`.env.example`](.env.example). Resumo:
 | `SERVER_PORT` | não (padrão 8080) | Porta HTTP da aplicação |
 | `APP_LOG_LEVEL` | não (padrão INFO) | Nível de log da aplicação |
 | `JPA_SHOW_SQL` | não (padrão false) | Loga o SQL gerado pelo Hibernate |
-| `WHATSAPP_ENABLED` | não (padrão false) | Liga a integração real com WhatsApp (quando implementada) |
-| `WHATSAPP_API_URL` | não | URL da API do provedor de WhatsApp - PENDENTE DE DEFINIÇÃO |
-| `WHATSAPP_ACCESS_TOKEN` | não | Token de acesso do provedor - PENDENTE DE DEFINIÇÃO |
-| `WHATSAPP_PHONE_NUMBER_ID` | não | Id do número remetente - PENDENTE DE DEFINIÇÃO |
-| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | não | Token de verificação do webhook - PENDENTE DE DEFINIÇÃO |
+| `WHATSAPP_ENABLED` | não (padrão false) | Liga o envio real de mensagens pela Meta Cloud API |
+| `WHATSAPP_API_URL` | não (padrão `https://graph.facebook.com`) | URL base da Graph API |
+| `WHATSAPP_API_VERSION` | não (padrão `v21.0`) | Versão da Graph API usada nas chamadas |
+| `WHATSAPP_ACCESS_TOKEN` | quando WhatsApp ativo | Token de acesso da Cloud API |
+| `WHATSAPP_PHONE_NUMBER_ID` | quando WhatsApp ativo | Id do número remetente (não é o telefone) |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | para cadastrar o webhook | String secreta usada no handshake de verificação |
+| `WHATSAPP_APP_SECRET` | sim, em produção | App Secret; valida a assinatura `X-Hub-Signature-256` das notificações |
 | `AI_ENABLED` | não (padrão false) | Habilita respostas geradas por IA depois da triagem |
 | `AI_API_URL` | quando IA ativa | Endpoint compatível com o formato OpenAI Responses |
 | `AI_API_KEY` | quando IA ativa | Chave do provedor, mantida somente no ambiente |
@@ -350,8 +514,14 @@ de responsabilidades".
 
 **Pronto:**
 
-* API REST com endpoints de health check, webhook (simulado) e consulta
-  de conversas/mensagens.
+* **Integração real com o WhatsApp via Meta Cloud API**: webhook com
+  handshake de verificação e validação de assinatura
+  `X-Hub-Signature-256`, deduplicação de reentregas, e envio das respostas
+  pela Cloud API - reutilizando o mesmo chatbot do simulador, sem
+  duplicação de lógica (ver seção 13). Depende apenas da configuração
+  externa na Meta para entrar em operação.
+* API REST com endpoints de health check, webhook (simplificado e real) e
+  consulta de conversas/mensagens.
 * Modelo de dados (`Customer`, `Conversation`, `Message`, `Triage`) com migrations
   Flyway.
 * Coleta guiada de nome, empresa e assunto, com resumo persistido ao final
@@ -381,13 +551,22 @@ de responsabilidades".
 
 **Em desenvolvimento / próximos passos imediatos:**
 
-* Definir com o cliente o provedor real de WhatsApp e implementar o
-  `WhatsAppClient` correspondente (seção 13).
+* **Configurar o app na Meta** e cadastrar o webhook para colocar o canal
+  WhatsApp em operação (seção 13.2 a 13.4). É a única pendência da
+  integração, e não pode ser resolvida por código.
+* Registrar um número próprio na WhatsApp Business Account, em vez do
+  número de teste, para atender qualquer cliente (seção 13.8).
 * Ampliar a base de conhecimento conforme os fluxos de negócio reais forem
   definidos (ex.: consulta a um catálogo de produtos).
 
 **Possíveis melhorias futuras:**
 
+* Processar o webhook do WhatsApp em background, respondendo `200` à Meta
+  imediatamente, caso o volume de mensagens cresça (ver seção 13.8).
+* Suporte a *template messages* aprovados, para poder iniciar conversa ou
+  responder fora da janela de 24h da Cloud API.
+* Tratar mídias recebidas (imagem, áudio, documento) em vez de apenas pedir
+  que o cliente escreva em texto.
 * Autenticação/autorização na API (hoje ela é aberta - ok para o escopo
   acadêmico atual, mas necessário antes de qualquer uso real com dados
   de clientes reais).

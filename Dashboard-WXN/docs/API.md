@@ -31,10 +31,14 @@ Também está disponível o health check padrão do Spring Boot Actuator em
 
 ## `POST /api/v1/webhook/whatsapp`
 
-Recebe uma mensagem do cliente. **Hoje simula o webhook do WhatsApp** (ver
-README, seção "Integração real com WhatsApp"): aceita o mesmo tipo de
-informação que chegaria de um provedor real, permitindo testar todo o
-fluxo antes de uma integração real estar configurada.
+Recebe uma mensagem do cliente em um formato simplificado. É o endpoint
+usado pelo **simulador** (`/simulator`) e pelos testes automatizados, e
+permite exercitar todo o fluxo do chatbot sem depender de credenciais
+externas.
+
+> O webhook **real** da Meta é outro endpoint:
+> `/api/v1/webhook/whatsapp/meta` (ver adiante). Os dois compartilham a
+> mesma lógica de chatbot, mas têm contratos HTTP diferentes.
 
 Na primeira conversa de um cliente, o bot inicia uma coleta guiada. A
 mensagem inicial é registrada como necessidade, e as mensagens seguintes
@@ -83,6 +87,100 @@ resposta local baseada em intenção é usada automaticamente.
 
 * **Erros**:
   * `400 Bad Request` - `phone` ou `message` ausentes/inválidos (corpo no formato padrão de erro, ver abaixo).
+
+---
+
+## `GET /api/v1/webhook/whatsapp/meta`
+
+Handshake de verificação da URL do webhook, exigido pela Meta **uma vez**,
+no momento em que você cadastra a URL no painel do app. Não é chamado no
+dia a dia.
+
+* **Query params** (enviados pela Meta):
+
+| Campo | Descrição |
+|---|---|
+| `hub.mode` | Sempre `subscribe` |
+| `hub.verify_token` | Deve ser igual a `WHATSAPP_WEBHOOK_VERIFY_TOKEN` |
+| `hub.challenge` | Valor que deve ser devolvido no corpo da resposta |
+
+* **Resposta `200 OK`** (`text/plain`): o valor de `hub.challenge`, sem
+  nenhum outro conteúdo.
+* **Erros**:
+  * `403 Forbidden` - `hub.verify_token` diferente do configurado,
+    `hub.mode` diferente de `subscribe`, ou `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+    não configurado no ambiente.
+
+---
+
+## `POST /api/v1/webhook/whatsapp/meta`
+
+Recebe as notificações reais da **WhatsApp Cloud API**. Este é o endpoint
+que a Meta chama a cada mensagem que um usuário envia para o número
+conectado.
+
+* **Headers**:
+
+| Header | Obrigatório | Descrição |
+|---|---|---|
+| `Content-Type` | sim | `application/json` |
+| `X-Hub-Signature-256` | sim, quando `WHATSAPP_APP_SECRET` está configurado | `sha256=<hmac hex>` do corpo cru, assinado pela Meta com o App Secret |
+
+* **Body**: o envelope da Meta. Somente os campos abaixo são consumidos;
+  qualquer outro é ignorado (a Meta acrescenta campos novos com frequência).
+
+```json
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "102290129340398",
+    "changes": [{
+      "field": "messages",
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": {
+          "display_phone_number": "15550783881",
+          "phone_number_id": "106540352242922"
+        },
+        "contacts": [{ "profile": { "name": "Maria Silva" }, "wa_id": "5511999999999" }],
+        "messages": [{
+          "from": "5511999999999",
+          "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQTRB",
+          "timestamp": "1749416383",
+          "type": "text",
+          "text": { "body": "Olá, quero saber o preço" }
+        }]
+      }
+    }]
+  }]
+}
+```
+
+* **Resposta `200 OK`**: corpo vazio. A resposta do chatbot **não** volta
+  no corpo HTTP - ela é entregue ao usuário pela própria Cloud API, em uma
+  chamada separada do backend para a Meta.
+
+  O endpoint responde `200` também quando a notificação não gera nenhuma
+  mensagem, porque a Meta reentrega qualquer notificação que não receba
+  `200` e desativa o webhook após falhas repetidas. Isso acontece quando:
+
+  * a notificação é de **status de entrega** (`sent`/`delivered`/`read`) -
+    ignorada, pois não é mensagem de usuário;
+  * a mensagem **não é de texto** (imagem, áudio, documento, localização) -
+    o usuário recebe um aviso pedindo que escreva em texto, e nada é
+    gravado, para não contaminar a coleta da triagem;
+  * a mensagem é uma **reentrega** de algo já processado (deduplicação por
+    `messages[].id`, guardado em `messages.external_id`);
+  * o payload é **inválido ou irreconhecível** - registrado em log.
+
+* **Erros**:
+  * `403 Forbidden` - assinatura `X-Hub-Signature-256` ausente ou inválida
+    (somente quando `WHATSAPP_APP_SECRET` está configurado).
+
+* **Processamento**: cada mensagem de texto é encaminhada para o mesmo
+  `MessageProcessingService` usado pelo endpoint do simulador, portanto
+  triagem, detecção de reclamação, respostas por IA e encerramento por
+  inatividade funcionam de forma idêntica nos dois canais.
 
 ---
 

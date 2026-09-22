@@ -68,10 +68,26 @@ public class MessageProcessingService {
 
     @Transactional
     public WhatsAppWebhookResponse process(WhatsAppWebhookRequest request) {
+        return process(request, null);
+    }
+
+    /**
+     * Mesmo processamento, guardando o id da mensagem no provedor externo.
+     *
+     * <p>Este e o metodo usado pelo canal real do WhatsApp; o simulador e os
+     * testes continuam chamando {@link #process(WhatsAppWebhookRequest)}. A
+     * logica de chatbot e identica para os dois canais - e exatamente o ponto
+     * de reuso entre eles.</p>
+     *
+     * @param externalId id da mensagem no provedor, ou {@code null} quando a
+     *                   origem nao tem um.
+     */
+    @Transactional
+    public WhatsAppWebhookResponse process(WhatsAppWebhookRequest request, String externalId) {
         Customer customer = customerService.findOrCreateByPhone(request.phone());
         Conversation conversation = conversationService.getOrCreateActiveConversation(customer);
 
-        Message inboundMessage = messageService.recordInbound(conversation, request.message());
+        Message inboundMessage = messageService.recordInbound(conversation, request.message(), externalId);
 
         if (conversation.getStatus() == ConversationStatus.WAITING_HUMAN
                 || conversation.getStatus() == ConversationStatus.HUMAN_ACTIVE) {

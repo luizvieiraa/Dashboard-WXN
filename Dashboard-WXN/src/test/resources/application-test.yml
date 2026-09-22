@@ -16,10 +16,12 @@ spring:
 
 whatsapp:
   enabled: false
-  api-url: ""
+  api-url: "https://graph.example.test"
+  api-version: "v21.0"
   access-token: ""
   phone-number-id: ""
-  webhook-verify-token: ""
+  webhook-verify-token: "token-de-teste"
+  app-secret: ""
 
 ai:
   enabled: false

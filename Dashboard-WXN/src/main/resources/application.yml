@@ -24,16 +24,18 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
-# Configuracoes proprias da integracao com o WhatsApp.
-# Ver docs/API.md e o README (secao "Integracao real com WhatsApp") para detalhes
-# sobre como essas variaveis serao usadas quando a integracao real for configurada.
-# PENDENTE DE DEFINICAO COM O CLIENTE: provedor final (Meta Cloud API, Twilio, etc.).
+# Integracao com a WhatsApp Business Platform (Meta Cloud API).
+# Com enabled=false (padrao) o sistema roda inteiro sem credenciais: as respostas
+# sao apenas logadas pelo MockWhatsAppSender e o simulador em /simulator continua
+# funcionando. Ver README (secao "Integracao real com WhatsApp") para o passo a passo.
 whatsapp:
   enabled: ${WHATSAPP_ENABLED:false}
-  api-url: ${WHATSAPP_API_URL:}
+  api-url: ${WHATSAPP_API_URL:https://graph.facebook.com}
+  api-version: ${WHATSAPP_API_VERSION:v21.0}
   access-token: ${WHATSAPP_ACCESS_TOKEN:}
   phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
   webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
+  app-secret: ${WHATSAPP_APP_SECRET:}
 
 # Geracao opcional de respostas com uma API compativel com OpenAI Responses.
 # Desabilitada por padrao; as respostas locais continuam sendo o fallback.

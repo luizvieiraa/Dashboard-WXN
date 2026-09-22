@@ -8,9 +8,16 @@ equipe pequena. Não há necessidade de algo mais elaborado (hexagonal,
 CQRS, microsserviços) para o escopo atual: um único serviço que recebe
 mensagens, aplica regras simples e persiste em um banco relacional.
 
+O backend é o núcleo da aplicação e atende **dois canais de entrada** que
+compartilham exatamente a mesma lógica de chatbot:
+
 ```
-Cliente (WhatsApp)
-      │
+Simulador / Frontend ──▶ POST /api/v1/webhook/whatsapp      ──┐
+  (static/simulator)                                          │
+                                                              ├──▶ MessageProcessingService
+WhatsApp (Meta Cloud API) ──▶ POST /api/v1/webhook/whatsapp/meta ─┘        (o chatbot)
+                                                                           │
+      ┌────────────────────────────────────────────────────────────────────┘
       ▼
 Webhook / Controller  (camada web: valida entrada, define rotas e códigos HTTP)
       │
@@ -41,7 +48,7 @@ com.chatbot.whatsapp
 │   ├── request/                # payloads recebidos pela API
 │   └── response/                # payloads devolvidos pela API
 ├── integration/
-│   └── whatsapp/                # abstração de envio de mensagens (hoje: mock; futuro: provedor real)
+│   └── whatsapp/                # tudo que conhece o formato da Meta: envio, parsing do webhook e assinatura
 ├── config/                      # beans de configuração (ex.: OpenAPI/Swagger)
 └── exception/                   # exceções de negócio + tratamento centralizado (RestControllerAdvice)
 ```
@@ -76,8 +83,9 @@ regra dentro do Controller" é resolvido colocando a orquestração em
    7. ao completar os campos, gera um resumo e marca a conversa como `QUALIFIED`;
    8. marca a mensagem recebida como processada e grava a mensagem de resposta;
    9. atualiza o "contexto" e o horário da última interação da conversa;
-   10. envia a resposta ao cliente via `WhatsAppClient` (hoje, um mock que
-      apenas loga a mensagem - ver `docs/DEVELOPMENT.md` e o README).
+   10. envia a resposta ao cliente via `WhatsAppClient` - o `MockWhatsAppSender`,
+      que apenas loga, ou o `MetaWhatsAppClient`, que entrega de verdade pela
+      Cloud API, conforme `whatsapp.enabled` (ver "Canal WhatsApp" adiante).
 3. O controller devolve `201 Created` com um resumo do que foi processado.
 
 Enquanto a conversa estiver em `WAITING_HUMAN` ou `HUMAN_ACTIVE`, o webhook
@@ -94,6 +102,85 @@ A interface em `static/dashboard` é servida pelo mesmo Spring Boot em
 `/dashboard`. Ela consome somente a API REST existente, mantendo a camada
 visual separada das regras de negócio e sem exigir um segundo processo de
 frontend no desenvolvimento ou no deploy.
+
+## Canal WhatsApp (Meta Cloud API)
+
+O WhatsApp é um **segundo canal de entrada** para o mesmo chatbot, não uma
+funcionalidade paralela. A regra que orientou o desenho foi: nenhuma linha
+de lógica de chatbot duplicada.
+
+```
+Usuário no WhatsApp
+      │
+      ▼
+Meta Cloud API
+      │  POST (envelope da Meta + X-Hub-Signature-256)
+      ▼
+MetaWebhookController          valida assinatura, responde 200 rápido
+      │
+      ▼
+MetaWebhookPayloadParser       envelope da Meta -> List<WhatsAppInboundMessage>
+      │
+      ▼
+WhatsAppInboundService         deduplica, descarta o que não é texto
+      │
+      ▼
+MessageProcessingService  ◀──── o MESMO serviço que o simulador usa
+      │                         (triagem, reclamação, intenção, IA, persistência)
+      ▼
+WhatsAppClient -> MetaWhatsAppClient
+      │  POST /{version}/{phone-number-id}/messages
+      ▼
+Meta Cloud API ──▶ Usuário no WhatsApp
+```
+
+Pontos de desenho relevantes:
+
+* **Rotas separadas.** O endpoint da Meta é
+  `/api/v1/webhook/whatsapp/meta`, distinto do
+  `/api/v1/webhook/whatsapp` usado pelo simulador. O envelope da Meta é
+  incompatível com o payload simplificado, e a Meta exige `200` (o outro
+  devolve `201` com o `botReply` no corpo, contrato do qual o simulador
+  depende). Unificar as rotas quebraria o simulador e colocaria a Meta em
+  loop de reentrega.
+* **O envio da resposta não é feito pelo controller do webhook.** Quem
+  envia é o próprio `MessageProcessingService`, no fim do processamento,
+  via `WhatsAppClient` - comportamento que já existia. Foi o que permitiu
+  reaproveitar o fluxo inteiro sem alterá-lo: bastou passar a existir uma
+  implementação real de `WhatsAppClient`.
+* **Uma única implementação de `WhatsAppClient` ativa por vez**, escolhida
+  por `whatsapp.enabled` via `@ConditionalOnProperty`:
+  `MockWhatsAppSender` (false, padrão) ou `MetaWhatsAppClient` (true).
+* **Idempotência.** A Meta reentrega qualquer notificação que não receba
+  `200`. O id da mensagem (`wamid...`) é gravado em `messages.external_id`,
+  que tem índice único (V4), e uma reentrega é descartada antes de chegar
+  ao chatbot. Sem isso, o bot responderia duas vezes e a coleta da triagem
+  avançaria de etapa com o mesmo dado.
+* **Autenticidade.** A URL do webhook é pública. A defesa real é a
+  assinatura `X-Hub-Signature-256` (HMAC-SHA256 do corpo cru com o App
+  Secret), verificada em `WhatsAppSignatureVerifier`. O
+  `webhook-verify-token` só participa do handshake `GET` inicial e não
+  protege as notificações.
+* **Tolerância a falhas.** O parser nunca lança exceção por campo
+  inesperado, o processamento é isolado por mensagem, e uma falha no envio
+  ao provedor é registrada em log sem propagar - a mensagem do cliente já
+  foi processada e persistida, e derrubar o fluxo faria a Meta reentregar.
+
+Como consequência de `HumanAttendanceService.reply()` também usar
+`WhatsAppClient`, a resposta que um atendente escreve no dashboard chega ao
+WhatsApp do cliente sem nenhum código adicional.
+
+### Limitações conhecidas
+
+* O processamento é **sincrônico**: o `200` só volta depois de persistir e
+  enviar a resposta. Com a IA habilitada isso inclui o timeout do provedor
+  (padrão 10s). Suficiente para o volume atual; um volume alto pediria
+  processar em background e responder `200` imediatamente.
+* Somente mensagens de **texto** são interpretadas. Mídias recebem um aviso
+  pedindo texto e não geram registro.
+* A Cloud API só permite mensagem livre dentro da **janela de 24h** após a
+  última mensagem do usuário. Fora dela, a Meta exige *template* aprovado -
+  não implementado.
 
 ## Respostas com IA e fallback
 

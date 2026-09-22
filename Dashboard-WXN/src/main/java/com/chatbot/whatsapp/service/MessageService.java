@@ -20,13 +20,33 @@ public class MessageService {
 
     @Transactional
     public Message recordInbound(Conversation conversation, String content) {
+        return recordInbound(conversation, content, null);
+    }
+
+    /**
+     * Grava uma mensagem recebida guardando tambem o id dela no provedor
+     * externo, quando existir (ex.: o {@code wamid} da Meta). Esse id e a chave
+     * de idempotencia contra reentregas do webhook.
+     *
+     * @param externalId id no provedor, ou {@code null} para origens que nao
+     *                   possuem um (ex.: o simulador local).
+     */
+    @Transactional
+    public Message recordInbound(Conversation conversation, String content, String externalId) {
         return messageRepository.save(
                 Message.builder()
                         .conversation(conversation)
                         .direction(MessageDirection.INBOUND)
                         .content(content)
                         .status(MessageStatus.RECEIVED)
+                        .externalId(externalId)
                         .build());
+    }
+
+    /** @see MessageRepository#existsByExternalId(String) */
+    @Transactional(readOnly = true)
+    public boolean alreadyProcessed(String externalId) {
+        return externalId != null && messageRepository.existsByExternalId(externalId);
     }
 
     @Transactional
