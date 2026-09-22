@@ -333,6 +333,8 @@ de responsabilidades".
   Flyway.
 * Coleta guiada de nome, empresa e assunto, com resumo persistido ao final
   da triagem.
+* Detecção de reclamações com interrupção da automação e encaminhamento
+  prioritário para atendimento humano.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.

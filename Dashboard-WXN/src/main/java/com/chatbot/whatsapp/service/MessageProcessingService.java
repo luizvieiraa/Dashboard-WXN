@@ -12,6 +12,8 @@ import com.chatbot.whatsapp.service.chatbot.ChatbotResponseService;
 import com.chatbot.whatsapp.service.chatbot.IntentClassifier;
 import com.chatbot.whatsapp.service.triage.InformationCollectionService;
 import com.chatbot.whatsapp.service.triage.TriageCollectionResult;
+import com.chatbot.whatsapp.service.triage.ComplaintDetector;
+import com.chatbot.whatsapp.service.triage.ComplaintEscalationService;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,8 @@ public class MessageProcessingService {
     private final ConversationService conversationService;
     private final MessageService messageService;
     private final InformationCollectionService informationCollectionService;
+    private final ComplaintDetector complaintDetector;
+    private final ComplaintEscalationService complaintEscalationService;
     private final IntentClassifier intentClassifier;
     private final ChatbotResponseService chatbotResponseService;
     private final WhatsAppClient whatsAppClient;
@@ -44,6 +48,8 @@ public class MessageProcessingService {
                                      ConversationService conversationService,
                                      MessageService messageService,
                                      InformationCollectionService informationCollectionService,
+                                     ComplaintDetector complaintDetector,
+                                     ComplaintEscalationService complaintEscalationService,
                                      IntentClassifier intentClassifier,
                                      ChatbotResponseService chatbotResponseService,
                                      WhatsAppClient whatsAppClient) {
@@ -51,6 +57,8 @@ public class MessageProcessingService {
         this.conversationService = conversationService;
         this.messageService = messageService;
         this.informationCollectionService = informationCollectionService;
+        this.complaintDetector = complaintDetector;
+        this.complaintEscalationService = complaintEscalationService;
         this.intentClassifier = intentClassifier;
         this.chatbotResponseService = chatbotResponseService;
         this.whatsAppClient = whatsAppClient;
@@ -63,22 +71,27 @@ public class MessageProcessingService {
 
         Message inboundMessage = messageService.recordInbound(conversation, request.message());
 
-        Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
-                conversation,
-                customer,
-                request.message()
-        );
-
         String reply;
         String context;
-        if (collectionResult.isPresent()) {
-            TriageCollectionResult result = collectionResult.get();
-            reply = result.reply();
-            context = result.context();
+        if (complaintDetector.isComplaint(request.message())) {
+            complaintEscalationService.escalate(conversation, request.message());
+            reply = ComplaintEscalationService.HANDOFF_REPLY;
+            context = "COMPLAINT_ESCALATED";
         } else {
-            ChatIntent intent = intentClassifier.classify(request.message());
-            reply = chatbotResponseService.generateReply(intent);
-            context = intent.name();
+            Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
+                    conversation,
+                    customer,
+                    request.message()
+            );
+            if (collectionResult.isPresent()) {
+                TriageCollectionResult result = collectionResult.get();
+                reply = result.reply();
+                context = result.context();
+            } else {
+                ChatIntent intent = intentClassifier.classify(request.message());
+                reply = chatbotResponseService.generateReply(intent);
+                context = intent.name();
+            }
         }
 
         messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);

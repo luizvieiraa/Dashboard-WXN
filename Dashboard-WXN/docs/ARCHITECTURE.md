@@ -67,14 +67,16 @@ regra dentro do Controller" é resolvido colocando a orquestração em
    1. busca ou cria o `Customer` pelo telefone (`CustomerService`);
    2. busca a conversa ativa do cliente ou cria uma nova (`ConversationService`);
    3. grava a mensagem recebida (`MessageService.recordInbound`);
-   4. inicia ou continua a coleta de nome, empresa e assunto
+   4. verifica primeiro se a mensagem indica uma reclamação; nesse caso,
+      interrompe a automação e envia a conversa para a fila humana;
+   5. inicia ou continua a coleta de nome, empresa e assunto
       (`InformationCollectionService`);
-   5. quando a coleta já terminou, classifica a intenção do texto e usa a
+   6. quando a coleta já terminou, classifica a intenção do texto e usa a
       resposta do chatbot atual;
-   6. ao completar os campos, gera um resumo e marca a conversa como `QUALIFIED`;
-   7. marca a mensagem recebida como processada e grava a mensagem de resposta;
-   8. atualiza o "contexto" e o horário da última interação da conversa;
-   9. envia a resposta ao cliente via `WhatsAppClient` (hoje, um mock que
+   7. ao completar os campos, gera um resumo e marca a conversa como `QUALIFIED`;
+   8. marca a mensagem recebida como processada e grava a mensagem de resposta;
+   9. atualiza o "contexto" e o horário da última interação da conversa;
+   10. envia a resposta ao cliente via `WhatsAppClient` (hoje, um mock que
       apenas loga a mensagem - ver `docs/DEVELOPMENT.md` e o README).
 3. O controller devolve `201 Created` com um resumo do que foi processado.
 

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.chatbot.whatsapp.entity.Customer;
 import com.chatbot.whatsapp.entity.Triage;
 import com.chatbot.whatsapp.entity.enums.TriageCategory;
+import com.chatbot.whatsapp.entity.enums.TriagePriority;
 import com.chatbot.whatsapp.repository.CustomerRepository;
 import com.chatbot.whatsapp.repository.TriageRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -119,6 +120,30 @@ class WhatsAppWebhookIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(triage.getMissingInformation()).isEmpty();
         org.assertj.core.api.Assertions.assertThat(triage.getSummary())
                 .contains("Maria Silva", "Empresa Exemplo", "Automatizar a prospecção comercial");
+    }
+
+    @Test
+    void deveInterromperColetaEEncaminharReclamacaoParaHumano() throws Exception {
+        String phone = "5511970000002";
+
+        JsonNode firstResponse = sendMessage(phone, "Quero informações sobre o serviço");
+        long conversationId = firstResponse.get("conversationId").asLong();
+        JsonNode complaintResponse = sendMessage(phone, "Na verdade estou insatisfeito, o sistema não funciona");
+
+        org.assertj.core.api.Assertions.assertThat(complaintResponse.get("botReply").asText())
+                .contains("atendente humano");
+
+        mockMvc.perform(get("/api/v1/conversations/{id}", conversationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("WAITING_HUMAN")))
+                .andExpect(jsonPath("$.context", is("COMPLAINT_ESCALATED")));
+
+        Triage triage = triageRepository.findByConversationId(conversationId).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(triage.getCategory()).isEqualTo(TriageCategory.COMPLAINT);
+        org.assertj.core.api.Assertions.assertThat(triage.getPriority()).isEqualTo(TriagePriority.HIGH);
+        org.assertj.core.api.Assertions.assertThat(triage.isRequiresHuman()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(triage.getMissingInformation()).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(triage.getSubject()).contains("não funciona");
     }
 
     @Test

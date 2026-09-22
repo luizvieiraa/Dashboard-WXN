@@ -72,6 +72,11 @@ Mantendo o mesmo `phone`, as próximas respostas devem informar, nesta
 ordem: nome, empresa e assunto. Ao final, a conversa passa para
 `QUALIFIED` e a triagem recebe um resumo.
 
+Reclamações têm precedência em qualquer ponto desse fluxo. Ao identificar
+termos de reclamação ou um pedido explícito por atendente, a conversa passa
+para `WAITING_HUMAN`, a triagem recebe categoria `COMPLAINT`, prioridade
+`HIGH` e `requiresHuman=true`.
+
 * **Erros**:
   * `400 Bad Request` - `phone` ou `message` ausentes/inválidos (corpo no formato padrão de erro, ver abaixo).
 
