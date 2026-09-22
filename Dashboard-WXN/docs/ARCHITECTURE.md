@@ -85,6 +85,11 @@ continua persistindo mensagens recebidas, mas não gera resposta automática.
 A equipe opera a fila pelos endpoints de assumir, responder e encerrar em
 `ConversationController` e `HumanAttendanceService`.
 
+`DashboardController` expõe uma visão de leitura preparada para o futuro
+front-end. `DashboardService` consolida contagens e transforma `Triage` em
+DTOs com os dados essenciais do cliente e da conversa, sem expor entidades
+JPA diretamente.
+
 ## Por que não uma "IA" ou motor de regras complexo agora?
 
 O escopo pedido é uma base **funcional e explicável**. `IntentClassifier` é

@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
+    long countByStatus(ConversationStatus status);
+
     Optional<Conversation> findFirstByCustomerAndStatusNotOrderByStartedAtDesc(
             Customer customer,
             ConversationStatus excludedStatus);

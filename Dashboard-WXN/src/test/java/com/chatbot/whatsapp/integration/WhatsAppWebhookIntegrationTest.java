@@ -2,6 +2,7 @@ package com.chatbot.whatsapp.integration;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -188,6 +189,31 @@ class WhatsAppWebhookIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("message", "Resposta"))))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void deveDisponibilizarIndicadoresETriagensParaDashboard() throws Exception {
+        String phone = "5511970000005";
+        sendMessage(phone, "Quero reclamar, o serviço está péssimo");
+
+        mockMvc.perform(get("/api/v1/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCustomers").isNumber())
+                .andExpect(jsonPath("$.totalConversations").isNumber())
+                .andExpect(jsonPath("$.totalMessages").isNumber())
+                .andExpect(jsonPath("$.botActive").isNumber())
+                .andExpect(jsonPath("$.complaints").isNumber())
+                .andExpect(jsonPath("$.requiringHuman").isNumber())
+                .andExpect(jsonPath("$.generatedAt", notNullValue()));
+
+        mockMvc.perform(get("/api/v1/dashboard/triages")
+                        .param("category", "COMPLAINT")
+                        .param("status", "WAITING_HUMAN")
+                        .param("requiresHuman", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].customerPhone", hasItem(phone)))
+                .andExpect(jsonPath("$[*].category", hasItem("COMPLAINT")))
+                .andExpect(jsonPath("$[*].priority", hasItem("HIGH")));
     }
 
     @Test

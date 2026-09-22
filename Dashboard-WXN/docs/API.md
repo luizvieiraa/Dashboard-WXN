@@ -141,6 +141,25 @@ As operações incompatíveis com o estado atual retornam `409 Conflict`.
 
 ---
 
+## Dashboard
+
+### `GET /api/v1/dashboard/summary`
+
+Retorna totais de clientes, conversas e mensagens, contagens por estado
+operacional, triagens de informação, reclamações e casos que requerem humano.
+
+### `GET /api/v1/dashboard/triages`
+
+Lista os dados estruturados da triagem junto com cliente e conversa. Aceita
+os filtros opcionais `category`, `status` e `requiresHuman`. O resultado é
+ordenado por prioridade e depois pela interação mais recente.
+
+Exemplo para a fila de reclamações:
+
+`GET /api/v1/dashboard/triages?category=COMPLAINT&status=WAITING_HUMAN&requiresHuman=true`
+
+---
+
 ## Formato padrão de erro
 
 Toda resposta de erro da API segue este formato:

@@ -125,6 +125,11 @@ Resumo dos endpoints:
 | POST | `/api/v1/webhook/whatsapp` | Recebe uma mensagem do cliente (simulação do webhook do WhatsApp) e devolve a resposta do chatbot |
 | GET | `/api/v1/conversations/{id}` | Consulta uma conversa e suas mensagens |
 | GET | `/api/v1/conversations/{id}/messages` | Lista as mensagens de uma conversa |
+| POST | `/api/v1/conversations/{id}/human/claim` | Atendente assume uma conversa encaminhada |
+| POST | `/api/v1/conversations/{id}/human/reply` | Atendente responde ao cliente |
+| POST | `/api/v1/conversations/{id}/close` | Encerra uma conversa |
+| GET | `/api/v1/dashboard/summary` | Indicadores consolidados da operação |
+| GET | `/api/v1/dashboard/triages` | Triagens filtráveis para o dashboard |
 
 ## 8. Como executar localmente
 
@@ -337,6 +342,8 @@ de responsabilidades".
   prioritário para atendimento humano.
 * API de atendimento humano para assumir a fila, responder ao cliente e
   encerrar a conversa sem concorrência com respostas automáticas.
+* API de dashboard com indicadores consolidados e listagem filtrável de
+  triagens, ordenada por prioridade e interação mais recente.
 * Processamento de mensagens com classificação de intenção simples e
   geração de resposta, isolados em camadas próprias e extensíveis.
 * Tratamento de erros centralizado e documentação da API via Swagger.
