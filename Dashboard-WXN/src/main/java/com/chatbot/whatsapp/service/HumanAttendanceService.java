@@ -5,6 +5,7 @@ import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.entity.enums.MessageStatus;
 import com.chatbot.whatsapp.exception.InvalidConversationStateException;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
+import com.chatbot.whatsapp.integration.whatsapp.WhatsAppSendResult;
 import com.chatbot.whatsapp.repository.ConversationRepository;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
@@ -48,11 +49,17 @@ public class HumanAttendanceService {
         requireStatus(conversation, ConversationStatus.HUMAN_ACTIVE, "respondida");
 
         String message = text.trim();
-        messageService.recordOutbound(conversation, message, MessageStatus.SENT);
+        WhatsAppSendResult sendResult = whatsAppClient.sendMessage(
+                conversation.getCustomer().getPhoneNumber(), message);
+        messageService.recordOutbound(
+                conversation,
+                message,
+                sendResult.sent() ? MessageStatus.SENT : MessageStatus.FAILED,
+                sendResult.providerMessageId()
+        );
         conversation.setContext("HUMAN_REPLY");
         conversation.setLastInteractionAt(Instant.now());
         Conversation saved = conversationRepository.save(conversation);
-        whatsAppClient.sendMessage(conversation.getCustomer().getPhoneNumber(), message);
         return saved;
     }
 

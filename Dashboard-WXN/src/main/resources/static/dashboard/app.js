@@ -1,6 +1,7 @@
 const API = {
     summary: "/api/v1/dashboard/summary",
-    triages: "/api/v1/dashboard/triages"
+    triages: "/api/v1/dashboard/triages",
+    whatsappContact: "/api/v1/whatsapp/contact"
 };
 
 const state = {
@@ -13,6 +14,7 @@ const elements = {
     filters: document.querySelector("#filters"),
     clearFilters: document.querySelector("#clear-filters"),
     refreshButton: document.querySelector("#refresh-button"),
+    whatsappButton: document.querySelector("#whatsapp-button"),
     rows: document.querySelector("#triage-rows"),
     feedback: document.querySelector("#feedback"),
     resultCount: document.querySelector("#result-count"),
@@ -85,6 +87,18 @@ async function loadDashboard() {
         showFeedback(error.message, true);
     } finally {
         setLoading(false);
+    }
+}
+
+async function loadWhatsAppContact() {
+    try {
+        const contact = await request(API.whatsappContact);
+        if (contact.available && contact.url) {
+            elements.whatsappButton.href = contact.url;
+            elements.whatsappButton.hidden = false;
+        }
+    } catch (_) {
+        elements.whatsappButton.hidden = true;
     }
 }
 
@@ -331,3 +345,4 @@ elements.dialogClose.addEventListener("click", () => elements.dialog.close());
 elements.dialogCancel.addEventListener("click", () => elements.dialog.close());
 
 loadDashboard();
+loadWhatsAppContact();

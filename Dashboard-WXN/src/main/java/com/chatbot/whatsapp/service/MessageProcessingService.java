@@ -8,6 +8,7 @@ import com.chatbot.whatsapp.entity.Message;
 import com.chatbot.whatsapp.entity.enums.MessageStatus;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
+import com.chatbot.whatsapp.integration.whatsapp.WhatsAppSendResult;
 import com.chatbot.whatsapp.service.chatbot.ChatIntent;
 import com.chatbot.whatsapp.service.chatbot.GeneratedReply;
 import com.chatbot.whatsapp.service.chatbot.IntelligentResponseService;
@@ -68,7 +69,7 @@ public class MessageProcessingService {
 
     @Transactional
     public WhatsAppWebhookResponse process(WhatsAppWebhookRequest request) {
-        return process(request, null);
+        return processInternal(request, null, false);
     }
 
     /**
@@ -84,6 +85,12 @@ public class MessageProcessingService {
      */
     @Transactional
     public WhatsAppWebhookResponse process(WhatsAppWebhookRequest request, String externalId) {
+        return processInternal(request, externalId, true);
+    }
+
+    private WhatsAppWebhookResponse processInternal(WhatsAppWebhookRequest request,
+                                                    String externalId,
+                                                    boolean sendToWhatsApp) {
         Customer customer = customerService.findOrCreateByPhone(request.phone());
         Conversation conversation = conversationService.getOrCreateActiveConversation(customer);
 
@@ -129,10 +136,17 @@ public class MessageProcessingService {
         }
 
         messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
-        messageService.recordOutbound(conversation, reply, MessageStatus.SENT);
         conversationService.touch(conversation, context);
 
-        whatsAppClient.sendMessage(customer.getPhoneNumber(), reply);
+        WhatsAppSendResult sendResult = sendToWhatsApp
+                ? whatsAppClient.sendMessage(customer.getPhoneNumber(), reply)
+                : WhatsAppSendResult.sent(null);
+        messageService.recordOutbound(
+                conversation,
+                reply,
+                sendResult.sent() ? MessageStatus.SENT : MessageStatus.FAILED,
+                sendResult.providerMessageId()
+        );
 
         return new WhatsAppWebhookResponse(
                 conversation.getId(),
@@ -141,5 +155,31 @@ public class MessageProcessingService {
                 reply,
                 Instant.now()
         );
+    }
+
+    /**
+     * Registra uma midia recebida sem usa-la como resposta da coleta guiada.
+     * O id externo fica persistido, portanto uma reentrega da Meta nao gera
+     * outro aviso para o cliente.
+     */
+    @Transactional
+    public void processUnsupported(String phone, String externalId, String type) {
+        Customer customer = customerService.findOrCreateByPhone(phone);
+        Conversation conversation = conversationService.getOrCreateActiveConversation(customer);
+        String inboundDescription = "[Mensagem do WhatsApp do tipo: " + type + "]";
+        Message inboundMessage = messageService.recordInbound(
+                conversation, inboundDescription, externalId);
+        messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
+
+        String reply = "Recebi seu envio, mas por aqui eu consigo ler apenas mensagens de texto. "
+                + "Pode me escrever o que você precisa?";
+        WhatsAppSendResult sendResult = whatsAppClient.sendMessage(phone, reply);
+        messageService.recordOutbound(
+                conversation,
+                reply,
+                sendResult.sent() ? MessageStatus.SENT : MessageStatus.FAILED,
+                sendResult.providerMessageId()
+        );
+        conversationService.touch(conversation, "UNSUPPORTED_WHATSAPP_MESSAGE");
     }
 }

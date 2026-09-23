@@ -192,8 +192,12 @@ select:focus, input:focus, textarea:focus { outline: 3px solid rgba(23, 105, 224
     cursor: pointer;
     font-size: 0.86rem;
     font-weight: 750;
+    text-decoration: none;
 }
+.button[hidden] { display: none; }
 .button:disabled { cursor: wait; opacity: 0.6; }
+.button-whatsapp { border-color: #25d366; background: #25d366; color: #062d17; box-shadow: 0 9px 22px rgba(37, 211, 102, .2); }
+.button-whatsapp:hover { background: #34e275; box-shadow: 0 12px 28px rgba(37, 211, 102, .27); transform: translateY(-1px); }
 .button-primary { background: var(--blue); color: #fff; }
 .button-primary:hover { background: #0d59c8; }
 .button-secondary { border-color: var(--line); background: #fff; color: var(--ink); }

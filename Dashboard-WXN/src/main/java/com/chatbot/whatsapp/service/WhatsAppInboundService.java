@@ -2,7 +2,6 @@ package com.chatbot.whatsapp.service;
 
 import com.chatbot.whatsapp.dto.request.WhatsAppWebhookRequest;
 import com.chatbot.whatsapp.dto.response.WhatsAppWebhookResponse;
-import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppInboundMessage;
 import java.util.List;
 import org.slf4j.Logger;
@@ -29,25 +28,13 @@ public class WhatsAppInboundService {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppInboundService.class);
 
-    /**
-     * Resposta para midias e outros tipos que o chatbot nao interpreta. Enviada
-     * direto pelo cliente, sem registrar mensagem nem alterar a triagem, para
-     * nao contaminar a coleta guiada com conteudo nao textual.
-     */
-    private static final String UNSUPPORTED_TYPE_REPLY =
-            "Recebi seu envio, mas por aqui eu consigo ler apenas mensagens de texto. "
-                    + "Pode me escrever o que você precisa?";
-
     private final MessageProcessingService messageProcessingService;
     private final MessageService messageService;
-    private final WhatsAppClient whatsAppClient;
 
     public WhatsAppInboundService(MessageProcessingService messageProcessingService,
-                                  MessageService messageService,
-                                  WhatsAppClient whatsAppClient) {
+                                  MessageService messageService) {
         this.messageProcessingService = messageProcessingService;
         this.messageService = messageService;
-        this.whatsAppClient = whatsAppClient;
     }
 
     /**
@@ -57,21 +44,26 @@ public class WhatsAppInboundService {
      * Meta reentrega o lote inteiro quando nao recebe 200, e reprocessar o que
      * ja deu certo geraria respostas duplicadas.</p>
      *
-     * @return quantas mensagens foram efetivamente processadas pelo chatbot.
+     * @return resumo das mensagens processadas, ignoradas e com falha.
      */
-    public int handleAll(List<WhatsAppInboundMessage> messages) {
+    public WhatsAppInboundBatchResult handleAll(List<WhatsAppInboundMessage> messages) {
         int processed = 0;
+        int ignored = 0;
+        int failed = 0;
         for (WhatsAppInboundMessage message : messages) {
             try {
                 if (handle(message)) {
                     processed++;
+                } else {
+                    ignored++;
                 }
             } catch (RuntimeException ex) {
+                failed++;
                 log.error("Falha ao processar a mensagem {} de {}: {}",
                         message.messageId(), message.phone(), ex.getMessage(), ex);
             }
         }
-        return processed;
+        return new WhatsAppInboundBatchResult(processed, ignored, failed);
     }
 
     private boolean handle(WhatsAppInboundMessage message) {
@@ -90,8 +82,9 @@ public class WhatsAppInboundService {
         if (!message.isText()) {
             log.info("Mensagem {} de {} e do tipo '{}' e nao sera interpretada pelo chatbot",
                     message.messageId(), message.phone(), message.type());
-            whatsAppClient.sendMessage(message.phone(), UNSUPPORTED_TYPE_REPLY);
-            return false;
+            messageProcessingService.processUnsupported(
+                    message.phone(), message.messageId(), message.type());
+            return true;
         }
 
         WhatsAppWebhookRequest request = new WhatsAppWebhookRequest(

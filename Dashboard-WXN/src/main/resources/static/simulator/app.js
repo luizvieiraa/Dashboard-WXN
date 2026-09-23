@@ -1,6 +1,7 @@
 const API = {
     webhook: "/api/v1/webhook/whatsapp",
-    conversation: id => `/api/v1/conversations/${id}`
+    conversation: id => `/api/v1/conversations/${id}`,
+    whatsappContact: "/api/v1/whatsapp/contact"
 };
 
 const statusLabels = {
@@ -41,6 +42,7 @@ const elements = {
     lastActivity: document.querySelector("#last-activity"),
     handoffNote: document.querySelector("#handoff-note"),
     newSession: document.querySelector("#new-session"),
+    whatsappButton: document.querySelector("#whatsapp-button"),
     composerHint: document.querySelector("#composer-hint"),
     toast: document.querySelector("#toast")
 };
@@ -196,6 +198,18 @@ async function request(url, options = {}) {
     return response.json();
 }
 
+async function loadWhatsAppContact() {
+    try {
+        const contact = await request(API.whatsappContact);
+        if (contact.available && contact.url) {
+            elements.whatsappButton.href = contact.url;
+            elements.whatsappButton.hidden = false;
+        }
+    } catch (_) {
+        elements.whatsappButton.hidden = true;
+    }
+}
+
 function resizeComposer() {
     elements.input.style.height = "auto";
     elements.input.style.height = `${Math.min(elements.input.scrollHeight, 130)}px`;
@@ -249,3 +263,4 @@ if (state.conversationId) {
 } else {
     startNewSession();
 }
+loadWhatsAppContact();

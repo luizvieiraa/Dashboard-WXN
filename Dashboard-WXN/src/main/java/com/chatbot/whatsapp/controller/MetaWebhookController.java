@@ -6,6 +6,7 @@ import com.chatbot.whatsapp.integration.whatsapp.WhatsAppInboundMessage;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppProperties;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppSignatureVerifier;
 import com.chatbot.whatsapp.service.WhatsAppInboundService;
+import com.chatbot.whatsapp.service.WhatsAppInboundBatchResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -110,10 +111,10 @@ public class MetaWebhookController {
      * {@code X-Hub-Signature-256} e calculada sobre os bytes exatos enviados
      * pela Meta - reserializar o JSON invalidaria a comparacao.</p>
      *
-     * <p>Sempre responde {@code 200} quando a origem e legitima, mesmo que
-     * nenhuma mensagem seja aproveitada (ex.: notificacao de status de entrega)
-     * ou que o processamento de alguma falhe. Qualquer outro status faz a Meta
-     * reentregar o lote e, em caso de falhas repetidas, desativar o webhook.</p>
+     * <p>Responde {@code 200} quando o lote foi tratado ou nao contem mensagens
+     * de usuario. Se alguma mensagem falhar internamente, responde {@code 500}
+     * para que a Meta tente entrega-la novamente; as mensagens ja persistidas
+     * sao descartadas pela chave de idempotencia.</p>
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Recebe notificacoes de mensagens da Meta",
@@ -145,9 +146,14 @@ public class MetaWebhookController {
             return ResponseEntity.ok().build();
         }
 
-        int processed = whatsAppInboundService.handleAll(messages);
-        log.info("Notificacao do webhook: {} mensagem(ns) recebida(s), {} processada(s)",
-                messages.size(), processed);
+        WhatsAppInboundBatchResult result = whatsAppInboundService.handleAll(messages);
+        log.info("Notificacao do webhook: {} recebida(s), {} processada(s), {} ignorada(s), {} falha(s)",
+                messages.size(), result.processed(), result.ignored(), result.failed());
+        if (result.hasFailures()) {
+            // Solicita reentrega. As mensagens que ja foram confirmadas ficam
+            // protegidas pelo external_id e nao serao respondidas novamente.
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
         return ResponseEntity.ok().build();
     }
 }

@@ -327,6 +327,7 @@ descrita abaixo** - nada disso pode ser feito por código.
 | `MetaWebhookPayloadParser` | Traduz o envelope da Meta em mensagens de domínio |
 | `WhatsAppInboundService` | Deduplica reentregas e encaminha ao chatbot existente |
 | `MetaWhatsAppClient` | Envia a resposta via `POST /{versão}/{phone-number-id}/messages` |
+| `WhatsAppConfigurationValidator` | Impede a aplicação de iniciar em modo real com credenciais incompletas |
 
 O chatbot **não foi duplicado**: as mensagens do WhatsApp entram no mesmo
 `MessageProcessingService` que o simulador usa, então triagem, detecção de
@@ -405,9 +406,10 @@ O token temporário expira em 24 horas. Para um ambiente que fica no ar:
 ```
 WHATSAPP_ENABLED=true
 WHATSAPP_API_URL=https://graph.facebook.com
-WHATSAPP_API_VERSION=v21.0
+WHATSAPP_API_VERSION=<versão exibida atualmente no painel da Meta, ex.: vXX.0>
 WHATSAPP_ACCESS_TOKEN=<token de acesso da Cloud API>
 WHATSAPP_PHONE_NUMBER_ID=<Phone number ID>
+WHATSAPP_CONTACT_PHONE=<número completo com país e DDD, somente dígitos>
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=<string secreta inventada por você>
 WHATSAPP_APP_SECRET=<App secret do app da Meta>
 ```
@@ -416,6 +418,12 @@ Essas credenciais devem ser guardadas como *secrets* da plataforma de
 deploy (ver seção 15) - **nunca** commitadas no repositório. Com
 `WHATSAPP_ENABLED=false` (padrão) o sistema roda inteiro sem nenhuma delas.
 
+Ao usar `WHATSAPP_ENABLED=true`, todas as configurações acima passam a
+ser obrigatórias. A aplicação falha ao iniciar se alguma estiver vazia, evitando
+subir um webhook que recebe mensagens mas não consegue responder ou validar a
+origem. O status `SENT` só é gravado depois que a Meta devolve o id da mensagem;
+falhas de envio ficam visíveis no histórico como `FAILED`.
+
 ### 13.7. Como testar de verdade
 
 1. Envie uma mensagem do seu WhatsApp pessoal para o número de teste da
@@ -423,7 +431,7 @@ deploy (ver seção 15) - **nunca** commitadas no repositório. Com
 2. Acompanhe os logs da aplicação. O caminho esperado é:
 
    ```
-   Notificacao do webhook: 1 mensagem(ns) recebida(s), 1 processada(s)
+   Notificacao do webhook: 1 recebida(s), 1 processada(s), 0 ignorada(s), 0 falha(s)
    Mensagem wamid.XXX processada na conversa 1
    Mensagem enviada ao WhatsApp de 55... (id do provedor: wamid.YYY)
    ```
@@ -444,19 +452,17 @@ deploy (ver seção 15) - **nunca** commitadas no repositório. Com
   um *template* previamente aprovado - **não implementado**. Na prática
   isso não afeta o chatbot, que sempre responde a uma mensagem recebida.
 * **Somente texto**: mídias (imagem, áudio, documento, localização) recebem
-  um aviso pedindo que o cliente escreva em texto, e não são registradas -
-  isso evita contaminar a coleta da triagem com conteúdo não textual.
+  um aviso pedindo que o cliente escreva em texto. O evento é registrado para
+  auditoria e deduplicação, mas não avança a coleta da triagem.
 * **Número de teste**: só conversa com os números cadastrados na lista de
   destinatários. Para atender qualquer pessoa é preciso registrar um número
   próprio e passar pela verificação do negócio na Meta.
 * **Processamento sincrônico**: o `200` para a Meta só volta depois de
   processar e enviar a resposta. Adequado ao volume atual; ver
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para a discussão.
-* **O simulador compartilha o `WhatsAppClient`**: com
-  `WHATSAPP_ENABLED=true`, uma mensagem enviada pelo `/simulator` faz o
-  backend tentar entregar a resposta de verdade, pelo WhatsApp, ao número
-  digitado no simulador. Para testar sem enviar nada, use
-  `WHATSAPP_ENABLED=false`.
+* **Simulador isolado do envio real**: o `/simulator` reutiliza as regras do
+  chatbot, mas nunca chama a Meta Cloud API, mesmo com
+  `WHATSAPP_ENABLED=true`.
 
 ## 14. Variáveis de ambiente
 
@@ -472,9 +478,10 @@ Todas documentadas em [`.env.example`](.env.example). Resumo:
 | `JPA_SHOW_SQL` | não (padrão false) | Loga o SQL gerado pelo Hibernate |
 | `WHATSAPP_ENABLED` | não (padrão false) | Liga o envio real de mensagens pela Meta Cloud API |
 | `WHATSAPP_API_URL` | não (padrão `https://graph.facebook.com`) | URL base da Graph API |
-| `WHATSAPP_API_VERSION` | não (padrão `v21.0`) | Versão da Graph API usada nas chamadas |
+| `WHATSAPP_API_VERSION` | quando WhatsApp ativo | Versão atual da Graph API indicada pela Meta |
 | `WHATSAPP_ACCESS_TOKEN` | quando WhatsApp ativo | Token de acesso da Cloud API |
 | `WHATSAPP_PHONE_NUMBER_ID` | quando WhatsApp ativo | Id do número remetente (não é o telefone) |
+| `WHATSAPP_CONTACT_PHONE` | quando WhatsApp ativo | Número público usado pelo botão `wa.me`, com país e DDD |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | para cadastrar o webhook | String secreta usada no handshake de verificação |
 | `WHATSAPP_APP_SECRET` | sim, em produção | App Secret; valida a assinatura `X-Hub-Signature-256` das notificações |
 | `AI_ENABLED` | não (padrão false) | Habilita respostas geradas por IA depois da triagem |

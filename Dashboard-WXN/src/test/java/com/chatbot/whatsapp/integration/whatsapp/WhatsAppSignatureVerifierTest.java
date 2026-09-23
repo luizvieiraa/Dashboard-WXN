@@ -25,6 +25,7 @@ class WhatsAppSignatureVerifierTest {
                 "v21.0",
                 "token",
                 "123",
+                "5511999999999",
                 "verify",
                 appSecret
         ));
@@ -74,12 +75,10 @@ class WhatsAppSignatureVerifierTest {
     }
 
     @Test
-    void deveIgnorarValidacaoQuandoAppSecretNaoEstiverConfigurado() {
+    void deveRejeitarQuandoIntegracaoRealEstaAtivaSemAppSecret() {
         WhatsAppSignatureVerifier verifier = verifierWith("");
 
         assertThat(verifier.isConfigured()).isFalse();
-        // Permite subir a integracao antes de configurar o App Secret; o
-        // comportamento e registrado como aviso em log.
-        assertThat(verifier.isValid(BODY.getBytes(StandardCharsets.UTF_8), null)).isTrue();
+        assertThat(verifier.isValid(BODY.getBytes(StandardCharsets.UTF_8), null)).isFalse();
     }
 }

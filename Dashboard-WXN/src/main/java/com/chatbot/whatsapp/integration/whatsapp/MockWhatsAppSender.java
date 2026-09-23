@@ -22,7 +22,8 @@ public class MockWhatsAppSender implements WhatsAppClient {
     private static final Logger log = LoggerFactory.getLogger(MockWhatsAppSender.class);
 
     @Override
-    public void sendMessage(String phoneNumber, String text) {
+    public WhatsAppSendResult sendMessage(String phoneNumber, String text) {
         log.info("[WHATSAPP MOCK] Para: {} | Mensagem: \"{}\"", phoneNumber, text);
+        return WhatsAppSendResult.sent(null);
     }
 }

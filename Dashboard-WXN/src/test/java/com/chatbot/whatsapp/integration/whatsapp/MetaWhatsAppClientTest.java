@@ -1,6 +1,7 @@
 package com.chatbot.whatsapp.integration.whatsapp;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -23,6 +24,7 @@ class MetaWhatsAppClientTest {
                 "v21.0",
                 accessToken,
                 phoneNumberId,
+                "5511999999999",
                 "verify-token",
                 "app-secret"
         );
@@ -47,9 +49,11 @@ class MetaWhatsAppClientTest {
                         {"messages": [{"id": "wamid.ENVIADA"}]}
                         """, MediaType.APPLICATION_JSON));
 
-        client.sendMessage("5511988887777", "Olá! Como posso ajudar?");
+        WhatsAppSendResult result = client.sendMessage("5511988887777", "Olá! Como posso ajudar?");
 
         server.verify();
+        assertThat(result.sent()).isTrue();
+        assertThat(result.providerMessageId()).isEqualTo("wamid.ENVIADA");
     }
 
     @Test
@@ -76,16 +80,18 @@ class MetaWhatsAppClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         MetaWhatsAppClient client = new MetaWhatsAppClient(properties, builder.build());
 
-        client.sendMessage("5511988887777", "texto");
+        WhatsAppSendResult result = client.sendMessage("5511988887777", "texto");
 
         // Nenhuma requisicao esperada: o cliente apenas registra erro em log.
         server.verify();
+        assertThat(result.sent()).isFalse();
     }
 
     @Test
     void deveMontarUrlSemBarraDuplicadaQuandoApiUrlTerminarComBarra() {
         WhatsAppProperties properties = new WhatsAppProperties(
-                true, "https://graph.example.test/", "v21.0", "token", "999", "verify", "secret");
+                true, "https://graph.example.test/", "v21.0", "token", "999",
+                "5511999999999", "verify", "secret");
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         MetaWhatsAppClient client = new MetaWhatsAppClient(properties, builder.build());
@@ -94,8 +100,9 @@ class MetaWhatsAppClientTest {
                 .andRespond(withSuccess("{\"messages\":[{\"id\":\"wamid.X\"}]}",
                         MediaType.APPLICATION_JSON));
 
-        client.sendMessage("5511988887777", "texto");
+        WhatsAppSendResult result = client.sendMessage("5511988887777", "texto");
 
         server.verify();
+        assertThat(result.sent()).isTrue();
     }
 }

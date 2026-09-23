@@ -31,9 +31,12 @@ spring:
 whatsapp:
   enabled: ${WHATSAPP_ENABLED:false}
   api-url: ${WHATSAPP_API_URL:https://graph.facebook.com}
-  api-version: ${WHATSAPP_API_VERSION:v21.0}
+  # Sem valor padrao de proposito: use a versao indicada no painel da Meta.
+  # Assim a aplicacao nao ativa uma versao antiga silenciosamente.
+  api-version: ${WHATSAPP_API_VERSION:}
   access-token: ${WHATSAPP_ACCESS_TOKEN:}
   phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  contact-phone: ${WHATSAPP_CONTACT_PHONE:}
   webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
   app-secret: ${WHATSAPP_APP_SECRET:}
 

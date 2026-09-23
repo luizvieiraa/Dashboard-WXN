@@ -51,12 +51,19 @@ public class MessageService {
 
     @Transactional
     public Message recordOutbound(Conversation conversation, String content, MessageStatus status) {
+        return recordOutbound(conversation, content, status, null);
+    }
+
+    @Transactional
+    public Message recordOutbound(Conversation conversation, String content, MessageStatus status,
+                                  String externalId) {
         return messageRepository.save(
                 Message.builder()
                         .conversation(conversation)
                         .direction(MessageDirection.OUTBOUND)
                         .content(content)
                         .status(status)
+                        .externalId(externalId)
                         .build());
     }
 

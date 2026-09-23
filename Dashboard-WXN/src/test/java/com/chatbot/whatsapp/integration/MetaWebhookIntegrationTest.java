@@ -221,7 +221,7 @@ class MetaWebhookIntegrationTest {
     }
 
     @Test
-    void deveResponderOkSemCriarConversaParaMensagemNaoTextual() throws Exception {
+    void deveRegistrarMensagemNaoTextualSemAvancarATriagem() throws Exception {
         String phone = "5511970001005";
         String payload = """
                 {
@@ -238,8 +238,17 @@ class MetaWebhookIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isOk());
 
-        // Nao contamina a triagem com conteudo que o chatbot nao interpreta.
-        assertThat(customerRepository.findByPhoneNumber(phone)).isEmpty();
+        Conversation conversation = activeConversationOf(phone).orElseThrow();
+        assertThat(conversation.getStatus()).isEqualTo(ConversationStatus.BOT_ACTIVE);
+        assertThat(conversation.getContext()).isEqualTo("UNSUPPORTED_WHATSAPP_MESSAGE");
+        assertThat(messageRepository.existsByExternalId("wamid.AUDIO")).isTrue();
+
+        // A reentrega da mesma midia nao gera um segundo aviso.
+        mockMvc.perform(post(WEBHOOK_PATH)
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isOk());
+        assertThat(messageRepository.findByConversationIdOrderByCreatedAtAscIdAsc(
+                conversation.getId())).hasSize(2);
     }
 
     @Test

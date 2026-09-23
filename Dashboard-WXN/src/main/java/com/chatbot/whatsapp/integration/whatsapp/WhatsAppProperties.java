@@ -17,6 +17,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param apiVersion     versao da Graph API usada nas chamadas (ex.: {@code v21.0}).
  * @param accessToken    token de acesso da Cloud API (nunca deve ser commitado).
  * @param phoneNumberId  identificador do numero remetente configurado na Meta.
+ * @param contactPhone   numero publico completo, somente digitos, usado no link wa.me.
  * @param webhookVerifyToken token comparado no handshake {@code GET} de verificacao do webhook.
  * @param appSecret      App Secret do app da Meta, usado para validar a assinatura
  *                       {@code X-Hub-Signature-256} de cada notificacao recebida.
@@ -29,6 +30,7 @@ public record WhatsAppProperties(
         String apiVersion,
         String accessToken,
         String phoneNumberId,
+        String contactPhone,
         String webhookVerifyToken,
         String appSecret
 ) {

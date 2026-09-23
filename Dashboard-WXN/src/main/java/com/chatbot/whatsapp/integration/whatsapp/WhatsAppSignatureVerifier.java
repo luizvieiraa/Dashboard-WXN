@@ -52,8 +52,13 @@ public class WhatsAppSignatureVerifier {
      */
     public boolean isValid(byte[] rawBody, String signature) {
         if (!isConfigured()) {
+            if (properties.enabled()) {
+                log.error("Webhook recusado: WHATSAPP_APP_SECRET e obrigatorio quando "
+                        + "WHATSAPP_ENABLED=true");
+                return false;
+            }
             log.warn("WHATSAPP_APP_SECRET nao configurado: a assinatura do webhook nao esta sendo "
-                    + "validada. Configure o App Secret antes de usar em producao.");
+                    + "validada porque a integracao real esta desabilitada.");
             return true;
         }
         if (rawBody == null || signature == null || !signature.startsWith(HEADER_PREFIX)) {

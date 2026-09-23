@@ -8,7 +8,7 @@ public enum MessageStatus {
     RECEIVED,
     /** Mensagem inbound processada com sucesso pelo chatbot. */
     PROCESSED,
-    /** Mensagem outbound enviada (ou simulada como enviada) ao cliente. */
+    /** Mensagem outbound confirmada pelo provedor (ou pelo mock local). */
     SENT,
     /** Falha ao processar ou enviar a mensagem. */
     FAILED

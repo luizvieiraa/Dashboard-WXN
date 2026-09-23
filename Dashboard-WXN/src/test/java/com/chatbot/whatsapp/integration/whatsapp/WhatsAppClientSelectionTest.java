@@ -47,7 +47,9 @@ class WhatsAppClientSelectionTest {
     @TestPropertySource(properties = {
             "whatsapp.enabled=true",
             "whatsapp.access-token=token-de-teste",
-            "whatsapp.phone-number-id=1234567890"
+            "whatsapp.phone-number-id=1234567890",
+            "whatsapp.contact-phone=5511999999999",
+            "whatsapp.app-secret=app-secret-de-teste"
     })
     class QuandoHabilitado {
 

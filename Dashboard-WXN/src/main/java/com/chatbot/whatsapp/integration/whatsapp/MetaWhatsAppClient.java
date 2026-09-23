@@ -20,10 +20,9 @@ import org.springframework.web.client.RestClientException;
  * duas implementacoes sao mutuamente exclusivas por configuracao, a camada de
  * negocio nunca precisa saber qual esta ativa.</p>
  *
- * <p>Segue o mesmo padrao do {@code OpenAiResponsesClient}: uma falha do
- * provedor externo e registrada em log, mas nunca propaga excecao - a mensagem
- * ja foi processada e persistida, e derrubar o fluxo faria a Meta reentregar a
- * notificacao e o cliente ser atendido duas vezes.</p>
+ * <p>Uma falha do provedor e registrada em log e devolvida como resultado. A
+ * camada de servico consegue assim persistir {@code FAILED}, em vez de marcar
+ * como enviada uma mensagem que a Meta recusou.</p>
  */
 @Component
 @ConditionalOnProperty(prefix = "whatsapp", name = "enabled", havingValue = "true")
@@ -46,7 +45,7 @@ public class MetaWhatsAppClient implements WhatsAppClient {
     }
 
     @Override
-    public void sendMessage(String phoneNumber, String text) {
+    public WhatsAppSendResult sendMessage(String phoneNumber, String text) {
         if (isBlank(properties.apiUrl())
                 || isBlank(properties.apiVersion())
                 || isBlank(properties.accessToken())
@@ -54,7 +53,7 @@ public class MetaWhatsAppClient implements WhatsAppClient {
             log.error("whatsapp.enabled=true mas WHATSAPP_API_URL, WHATSAPP_API_VERSION, "
                     + "WHATSAPP_ACCESS_TOKEN ou WHATSAPP_PHONE_NUMBER_ID nao foi configurado. "
                     + "Mensagem para {} NAO foi enviada.", phoneNumber);
-            return;
+            return WhatsAppSendResult.failed("Configuracao da Meta Cloud API incompleta");
         }
 
         try {
@@ -71,19 +70,26 @@ public class MetaWhatsAppClient implements WhatsAppClient {
                     .retrieve()
                     .body(SendMessageResponse.class);
 
+            String providerMessageId = extractMessageId(response);
+            if (providerMessageId == null) {
+                log.error("Meta Cloud API respondeu sem o id da mensagem enviada para {}", phoneNumber);
+                return WhatsAppSendResult.failed("Resposta da Meta sem id da mensagem");
+            }
             log.info("Mensagem enviada ao WhatsApp de {} (id do provedor: {})",
-                    phoneNumber, extractMessageId(response));
+                    phoneNumber, providerMessageId);
+            return WhatsAppSendResult.sent(providerMessageId);
         } catch (RestClientException ex) {
             // Causas tipicas: token expirado, janela de 24h fechada (exige
             // template aprovado) ou numero fora da lista de teste.
             log.error("Falha ao enviar mensagem para {} via Meta Cloud API: {}",
                     phoneNumber, ex.getMessage());
+            return WhatsAppSendResult.failed(ex.getMessage());
         }
     }
 
     private String extractMessageId(SendMessageResponse response) {
         if (response == null || response.messages() == null || response.messages().isEmpty()) {
-            return "desconhecido";
+            return null;
         }
         return response.messages().get(0).id();
     }

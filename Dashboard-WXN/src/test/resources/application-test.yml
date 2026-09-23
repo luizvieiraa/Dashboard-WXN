@@ -20,6 +20,7 @@ whatsapp:
   api-version: "v21.0"
   access-token: ""
   phone-number-id: ""
+  contact-phone: ""
   webhook-verify-token: "token-de-teste"
   app-secret: ""
 
