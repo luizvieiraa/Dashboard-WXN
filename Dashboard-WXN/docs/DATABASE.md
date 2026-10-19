@@ -1,5 +1,17 @@
 # Banco de Dados
 
+## Entidades centrais e migração V5
+
+`V5__add_core_domain_entities.sql` adiciona `chatbots`, `attendants` e
+`attendances`. `conversations.chatbot_id` referencia o chatbot padrão WXN.
+`attendances.conversation_id` é único e referencia a conversa;
+`attendances.attendant_id` referencia o operador. Datas de início e fim
+registram o ciclo do atendimento humano.
+
+A migração converte `assigned_to` e `assigned_at` das conversas existentes
+em operadores e atendimentos, preservando as datas de encerramento.
+As colunas antigas continuam disponíveis para compatibilidade com a API.
+
 ## Escolha: PostgreSQL
 
 PostgreSQL foi escolhido (confirmando a preferência inicial do time) pelos

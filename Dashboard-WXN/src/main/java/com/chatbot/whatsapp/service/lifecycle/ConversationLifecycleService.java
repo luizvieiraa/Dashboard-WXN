@@ -44,9 +44,7 @@ public class ConversationLifecycleService {
                 .findByStatusInAndLastInteractionAtBefore(AUTOMATED_STATUSES, cutoff);
 
         inactive.forEach(conversation -> {
-            conversation.setStatus(ConversationStatus.CLOSED);
-            conversation.setClosedAt(now);
-            conversation.setContext(AUTO_CLOSE_CONTEXT);
+            conversation.closeForInactivity(now);
         });
         conversationRepository.saveAll(inactive);
 

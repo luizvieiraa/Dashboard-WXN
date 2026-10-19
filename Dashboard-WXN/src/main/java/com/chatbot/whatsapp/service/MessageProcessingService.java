@@ -128,7 +128,7 @@ public class MessageProcessingService {
             } else {
                 ChatIntent intent = intentClassifier.classify(request.message());
                 GeneratedReply generatedReply = intelligentResponseService.generateReply(
-                        request.message(), intent, customer
+                        request.message(), intent, customer, conversation.getChatbot()
                 );
                 reply = generatedReply.text();
                 context = generatedReply.context();

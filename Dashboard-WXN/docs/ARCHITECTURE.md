@@ -1,5 +1,40 @@
 # Arquitetura
 
+## Modelo orientado a objetos
+
+As entidades centrais são `Customer` (cliente), `Attendant` (atendente),
+`Conversation` (conversa), `Message` (mensagem), `Chatbot` e `Attendance`
+(atendimento). `Triage` complementa os dados de qualificação.
+
+* Um cliente possui várias conversas, cada uma vinculada a um chatbot.
+* Uma conversa possui várias mensagens e, opcionalmente, uma triagem.
+* Uma conversa pode ter um atendimento humano vinculado a um atendente.
+  Um atendente pode participar de vários atendimentos.
+
+```mermaid
+classDiagram
+    Customer "1" <-- "0..*" Conversation : cliente
+    Chatbot "1" <-- "0..*" Conversation : assistente
+    Conversation "1" <-- "0..*" Message : historico
+    Conversation "1" -- "0..1" Attendance : atendimento humano
+    Attendant "1" <-- "0..*" Attendance : responsavel
+    Conversation "1" <-- "0..1" Triage : qualificacao
+```
+
+`Conversation.assume`, `close`, `closeForInactivity` e
+`changeAutomatedStatus` validam as mudanças de estado. Assumir cria o
+`Attendance`; encerrar atualiza a conversa e seu atendimento juntos.
+Os serviços orquestram essas operações dentro de transações.
+`Chatbot.reply` implementa as respostas locais utilizadas quando a IA não
+produz resposta. As interfaces `WhatsAppClient`, `AiClient` e
+`IntentClassifier` fornecem abstração e polimorfismo. Não há necessidade
+de criar herança artificial entre entidades sem relação de especialização.
+
+Os campos `assignedTo` e `assignedAt` continuam como projeções compatíveis
+com a API e o dashboard. O domínio os atualiza ao assumir o atendimento.
+O contrato atual identifica atendentes pelo nome; autenticação e identificação
+por uma conta de operador continuam fora deste modelo.
+
 ## Visão geral
 
 O backend é uma API REST em camadas (*layered architecture*), o padrão mais

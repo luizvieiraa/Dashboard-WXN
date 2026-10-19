@@ -1,6 +1,7 @@
 package com.chatbot.whatsapp.service.chatbot;
 
 import com.chatbot.whatsapp.entity.Customer;
+import com.chatbot.whatsapp.entity.Chatbot;
 import com.chatbot.whatsapp.integration.ai.AiClient;
 import org.springframework.stereotype.Service;
 
@@ -17,13 +18,17 @@ public class IntelligentResponseService {
     }
 
     public GeneratedReply generateReply(String message, ChatIntent intent, Customer customer) {
+        return generateReply(message, intent, customer, Chatbot.standard());
+    }
+
+    public GeneratedReply generateReply(String message, ChatIntent intent, Customer customer, Chatbot chatbot) {
         String context = "nome=%s; empresa=%s"
                 .formatted(orUnknown(customer.getName()), orUnknown(customer.getCompanyName()));
 
         return aiClient.generateReply(message, context)
                 .map(text -> new GeneratedReply(text, "AI_RESPONSE"))
                 .orElseGet(() -> new GeneratedReply(
-                        fallbackService.generateReply(intent),
+                        fallbackService.generateReply(chatbot, intent),
                         intent.name()
                 ));
     }

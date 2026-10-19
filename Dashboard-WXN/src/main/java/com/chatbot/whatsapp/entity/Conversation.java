@@ -2,6 +2,8 @@ package com.chatbot.whatsapp.entity;
 
 import com.chatbot.whatsapp.entity.enums.ChannelType;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
+import com.chatbot.whatsapp.exception.InvalidConversationStateException;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,13 +14,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 /**
@@ -31,7 +33,6 @@ import org.hibernate.annotations.CreationTimestamp;
 @Entity
 @Table(name = "conversations")
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -72,4 +73,70 @@ public class Conversation {
 
     @Column(name = "closed_at")
     private Instant closedAt;
+
+    @Builder.Default
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "chatbot_id", nullable = false)
+    private Chatbot chatbot = Chatbot.standard();
+
+    @OneToOne(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    private Attendance attendance;
+
+    public void assume(Attendant attendant) {
+        requireStatus(ConversationStatus.WAITING_HUMAN);
+        Instant now = Instant.now();
+        attendance = new Attendance(this, attendant, now);
+        assignedTo = attendant.getName();
+        assignedAt = now;
+        status = ConversationStatus.HUMAN_ACTIVE;
+        recordInteraction("HUMAN_ATTENDANCE_STARTED");
+    }
+
+    public void requireHumanAttendance() {
+        requireStatus(ConversationStatus.HUMAN_ACTIVE);
+    }
+
+    public void recordInteraction(String context) {
+        if (status == ConversationStatus.CLOSED) throw invalidState();
+        this.context = context;
+        lastInteractionAt = Instant.now();
+    }
+
+    public void changeAutomatedStatus(ConversationStatus next) {
+        if (status == ConversationStatus.CLOSED || status == ConversationStatus.HUMAN_ACTIVE
+                || status == ConversationStatus.WAITING_HUMAN
+                || next == null || next == ConversationStatus.HUMAN_ACTIVE || next == ConversationStatus.CLOSED) {
+            throw invalidState();
+        }
+        status = next;
+    }
+
+    public void close() {
+        closeAt(Instant.now(), "CONVERSATION_CLOSED");
+        lastInteractionAt = closedAt;
+    }
+
+    public void closeForInactivity(Instant now) {
+        if (status != ConversationStatus.BOT_ACTIVE && status != ConversationStatus.COLLECTING_INFORMATION
+                && status != ConversationStatus.QUALIFIED) throw invalidState();
+        closeAt(now, "AUTO_CLOSED_INACTIVITY");
+    }
+
+    private void closeAt(Instant now, String context) {
+        java.util.Objects.requireNonNull(now, "Data de encerramento obrigatoria");
+        if (status == ConversationStatus.CLOSED) throw invalidState();
+        if (attendance != null) attendance.close(now);
+        status = ConversationStatus.CLOSED;
+        closedAt = now;
+        this.context = context;
+    }
+
+    private void requireStatus(ConversationStatus expected) {
+        if (status != expected) throw invalidState();
+    }
+
+    private InvalidConversationStateException invalidState() {
+        return new InvalidConversationStateException(
+                "Operacao invalida para conversa em " + status);
+    }
 }

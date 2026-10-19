@@ -1,13 +1,12 @@
 package com.chatbot.whatsapp.service;
 
 import com.chatbot.whatsapp.entity.Conversation;
-import com.chatbot.whatsapp.entity.enums.ConversationStatus;
+import com.chatbot.whatsapp.entity.Attendant;
 import com.chatbot.whatsapp.entity.enums.MessageStatus;
-import com.chatbot.whatsapp.exception.InvalidConversationStateException;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppSendResult;
 import com.chatbot.whatsapp.repository.ConversationRepository;
-import java.time.Instant;
+import com.chatbot.whatsapp.repository.AttendantRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,34 +18,34 @@ public class HumanAttendanceService {
     private final ConversationRepository conversationRepository;
     private final MessageService messageService;
     private final WhatsAppClient whatsAppClient;
+    private final AttendantRepository attendantRepository;
 
     public HumanAttendanceService(ConversationService conversationService,
                                   ConversationRepository conversationRepository,
                                   MessageService messageService,
-                                  WhatsAppClient whatsAppClient) {
+                                  WhatsAppClient whatsAppClient,
+                                  AttendantRepository attendantRepository) {
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
         this.messageService = messageService;
         this.whatsAppClient = whatsAppClient;
+        this.attendantRepository = attendantRepository;
     }
 
     @Transactional
     public Conversation claim(Long conversationId, String attendant) {
         Conversation conversation = conversationService.findById(conversationId);
-        requireStatus(conversation, ConversationStatus.WAITING_HUMAN, "assumida");
-
-        conversation.setStatus(ConversationStatus.HUMAN_ACTIVE);
-        conversation.setAssignedTo(attendant.trim());
-        conversation.setAssignedAt(Instant.now());
-        conversation.setContext("HUMAN_ATTENDANCE_STARTED");
-        conversation.setLastInteractionAt(Instant.now());
+        Attendant candidate = new Attendant(attendant);
+        var operator = attendantRepository.findFirstByName(candidate.getName())
+                .orElseGet(() -> attendantRepository.save(candidate));
+        conversation.assume(operator);
         return conversationRepository.save(conversation);
     }
 
     @Transactional
     public Conversation reply(Long conversationId, String text) {
         Conversation conversation = conversationService.findById(conversationId);
-        requireStatus(conversation, ConversationStatus.HUMAN_ACTIVE, "respondida");
+        conversation.requireHumanAttendance();
 
         String message = text.trim();
         WhatsAppSendResult sendResult = whatsAppClient.sendMessage(
@@ -57,8 +56,7 @@ public class HumanAttendanceService {
                 sendResult.sent() ? MessageStatus.SENT : MessageStatus.FAILED,
                 sendResult.providerMessageId()
         );
-        conversation.setContext("HUMAN_REPLY");
-        conversation.setLastInteractionAt(Instant.now());
+        conversation.recordInteraction("HUMAN_REPLY");
         Conversation saved = conversationRepository.save(conversation);
         return saved;
     }
@@ -66,25 +64,8 @@ public class HumanAttendanceService {
     @Transactional
     public Conversation close(Long conversationId) {
         Conversation conversation = conversationService.findById(conversationId);
-        if (conversation.getStatus() == ConversationStatus.CLOSED) {
-            throw new InvalidConversationStateException("A conversa ja esta encerrada");
-        }
-
-        conversation.setStatus(ConversationStatus.CLOSED);
-        conversation.setClosedAt(Instant.now());
-        conversation.setContext("CONVERSATION_CLOSED");
-        conversation.setLastInteractionAt(Instant.now());
+        conversation.close();
         return conversationRepository.save(conversation);
     }
 
-    private void requireStatus(Conversation conversation,
-                               ConversationStatus expected,
-                               String operation) {
-        if (conversation.getStatus() != expected) {
-            throw new InvalidConversationStateException(
-                    "A conversa nao pode ser %s enquanto estiver em %s"
-                            .formatted(operation, conversation.getStatus())
-            );
-        }
-    }
 }

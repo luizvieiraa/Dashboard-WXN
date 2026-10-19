@@ -10,10 +10,10 @@ completo (clonar, subir o banco, rodar a aplicação).
 * Pacotes por camada (`controller`, `service`, `repository`, `entity`,
   `dto`, `config`, `exception`, `integration`) - ver `docs/ARCHITECTURE.md`.
 * DTOs são `record`s Java (imutáveis, sem boilerplate).
-* Entidades usam Lombok (`@Getter`/`@Setter`/`@Builder`) para reduzir
-  código repetitivo; evite adicionar lógica de negócio dentro de uma
-  entidade - isso pertence à camada de `service`.
-* Toda regra de negócio fica em `service`, nunca em `controller`.
+* Entidades usam Lombok para reduzir código repetitivo. `Conversation`,
+  `Attendant`, `Attendance` e `Chatbot` não expõem setters públicos.
+* As entidades protegem suas regras e transições de estado; os serviços
+  coordenam persistência e integrações. Controllers validam e delegam.
 * Nomes em português são aceitáveis em comentários/documentação; nomes de
   classes, métodos e variáveis ficam em inglês, seguindo a convenção do
   ecossistema Java/Spring.

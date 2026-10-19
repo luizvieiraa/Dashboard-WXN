@@ -49,14 +49,13 @@ public class ConversationService {
 
     @Transactional
     public void touch(Conversation conversation, String lastContext) {
-        conversation.setLastInteractionAt(Instant.now());
-        conversation.setContext(lastContext);
+        conversation.recordInteraction(lastContext);
         conversationRepository.save(conversation);
     }
 
     @Transactional
     public void changeStatus(Conversation conversation, ConversationStatus status) {
-        conversation.setStatus(status);
+        conversation.changeAutomatedStatus(status);
         conversationRepository.save(conversation);
     }
 }
