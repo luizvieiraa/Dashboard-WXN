@@ -135,11 +135,33 @@ function createTriageRow(triage) {
 
 function customerContent(triage) {
     const wrapper = document.createElement("div");
-    wrapper.append(
+    wrapper.className = "customer";
+
+    const details = document.createElement("div");
+    details.append(
         strong(triage.customerName || "Nome não informado"),
         small(triage.companyName || triage.customerPhone)
     );
+
+    wrapper.append(avatar(triage.customerName), details);
     return wrapper;
+}
+
+function avatar(name) {
+    const element = text(initials(name));
+    element.className = "avatar";
+    element.setAttribute("aria-hidden", "true");
+    return element;
+}
+
+function initials(name) {
+    const words = (name || "").trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return "?";
+
+    const firstLetter = word => [...word][0].toUpperCase();
+    return words.length === 1
+        ? firstLetter(words[0])
+        : firstLetter(words[0]) + firstLetter(words[words.length - 1]);
 }
 
 function subjectContent(triage) {

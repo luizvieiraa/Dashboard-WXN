@@ -19,15 +19,19 @@
             </span>
         </a>
 
+        <p class="nav-label">Menu</p>
         <nav>
-            <a class="nav-item active" href="#overview">
-                <span aria-hidden="true">▦</span> Visão geral
+            <a class="nav-item active" href="#overview" aria-current="page">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                Visão geral
             </a>
             <a class="nav-item" href="#triages">
-                <span aria-hidden="true">≡</span> Triagens
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>
+                Triagens
             </a>
             <a class="nav-item" href="/simulator">
-                <span aria-hidden="true">○</span> Simulador
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>
+                Simulador
             </a>
         </nav>
 
@@ -47,13 +51,18 @@
                 <h1>Central de atendimento</h1>
             </div>
             <div class="topbar-actions">
-                <span id="last-updated" class="last-updated">Carregando dados...</span>
+                <span class="last-updated">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+                    <span id="last-updated">Carregando dados...</span>
+                </span>
                 <a id="whatsapp-button" class="button button-whatsapp" href="#"
                    target="_blank" rel="noopener noreferrer" hidden>
-                    <span aria-hidden="true">&#9993;</span> Conversar no WhatsApp
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>
+                    Conversar no WhatsApp
                 </a>
                 <button id="refresh-button" class="button button-secondary" type="button">
-                    <span aria-hidden="true">↻</span> Atualizar
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+                    Atualizar
                 </button>
             </div>
         </header>
@@ -69,35 +78,60 @@
 
             <div id="metrics" class="metrics" aria-live="polite">
                 <article class="metric-card metric-total">
-                    <span class="metric-icon" aria-hidden="true">◎</span>
-                    <div><span>Clientes</span><strong data-metric="totalCustomers">—</strong></div>
-                    <small>contatos cadastrados</small>
+                    <div class="metric-header">
+                        <span class="metric-label">Clientes</span>
+                        <span class="metric-icon" aria-hidden="true">
+                            <svg class="icon" viewBox="0 0 24 24"><circle cx="9.5" cy="7.5" r="3.5"/><path d="M3 20v-1.5a4 4 0 0 1 4-4h5a4 4 0 0 1 4 4V20"/><path d="M16 4.2a3.5 3.5 0 0 1 0 6.6M21 20v-1.5a4 4 0 0 0-3-3.9"/></svg>
+                        </span>
+                    </div>
+                    <strong class="metric-value" data-metric="totalCustomers">—</strong>
+                    <small class="metric-caption">contatos cadastrados</small>
                 </article>
                 <article class="metric-card metric-qualified">
-                    <span class="metric-icon" aria-hidden="true">✓</span>
-                    <div><span>Qualificados</span><strong data-metric="qualified">—</strong></div>
-                    <small>triagens concluídas</small>
+                    <div class="metric-header">
+                        <span class="metric-label">Qualificados</span>
+                        <span class="metric-icon" aria-hidden="true">
+                            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>
+                        </span>
+                    </div>
+                    <strong class="metric-value" data-metric="qualified">—</strong>
+                    <small class="metric-caption">triagens concluídas</small>
                 </article>
                 <article class="metric-card metric-waiting">
-                    <span class="metric-icon" aria-hidden="true">!</span>
-                    <div><span>Aguardando humano</span><strong data-metric="waitingHuman">—</strong></div>
-                    <small>na fila de atendimento</small>
+                    <div class="metric-header">
+                        <span class="metric-label">Aguardando humano</span>
+                        <span class="metric-icon" aria-hidden="true">
+                            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        </span>
+                    </div>
+                    <strong class="metric-value" data-metric="waitingHuman">—</strong>
+                    <small class="metric-caption">na fila de atendimento</small>
                 </article>
                 <article class="metric-card metric-active">
-                    <span class="metric-icon" aria-hidden="true">→</span>
-                    <div><span>Em atendimento</span><strong data-metric="humanActive">—</strong></div>
-                    <small>com atendente ativo</small>
+                    <div class="metric-header">
+                        <span class="metric-label">Em atendimento</span>
+                        <span class="metric-icon" aria-hidden="true">
+                            <svg class="icon" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><path d="M4 15a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2zM20 15a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2z"/></svg>
+                        </span>
+                    </div>
+                    <strong class="metric-value" data-metric="humanActive">—</strong>
+                    <small class="metric-caption">com atendente ativo</small>
                 </article>
                 <article class="metric-card metric-complaints">
-                    <span class="metric-icon" aria-hidden="true">△</span>
-                    <div><span>Reclamações</span><strong data-metric="complaints">—</strong></div>
-                    <small>casos identificados</small>
+                    <div class="metric-header">
+                        <span class="metric-label">Reclamações</span>
+                        <span class="metric-icon" aria-hidden="true">
+                            <svg class="icon" viewBox="0 0 24 24"><path d="M10.3 4.2 2.6 17.5a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></svg>
+                        </span>
+                    </div>
+                    <strong class="metric-value" data-metric="complaints">—</strong>
+                    <small class="metric-caption">casos identificados</small>
                 </article>
             </div>
         </section>
 
-        <section id="triages" class="section triage-section" aria-labelledby="triages-title">
-            <div class="section-heading triage-heading">
+        <section id="triages" class="section" aria-labelledby="triages-title">
+            <div class="section-heading">
                 <div>
                     <p class="eyebrow">Acompanhamento</p>
                     <h2 id="triages-title">Triagens recentes</h2>
@@ -105,55 +139,57 @@
                 <span id="result-count" class="result-count">0 resultados</span>
             </div>
 
-            <form id="filters" class="filters" aria-label="Filtros de triagem">
-                <label>
-                    <span>Categoria</span>
-                    <select name="category">
-                        <option value="">Todas</option>
-                        <option value="INFORMATION">Informação</option>
-                        <option value="COMPLAINT">Reclamação</option>
-                        <option value="OTHER">Outro</option>
-                    </select>
-                </label>
-                <label>
-                    <span>Status</span>
-                    <select name="status">
-                        <option value="">Todos</option>
-                        <option value="COLLECTING_INFORMATION">Coletando informações</option>
-                        <option value="QUALIFIED">Qualificado</option>
-                        <option value="WAITING_HUMAN">Aguardando humano</option>
-                        <option value="HUMAN_ACTIVE">Em atendimento</option>
-                        <option value="CLOSED">Encerrado</option>
-                    </select>
-                </label>
-                <label>
-                    <span>Atendimento</span>
-                    <select name="requiresHuman">
-                        <option value="">Todos</option>
-                        <option value="true">Requer humano</option>
-                        <option value="false">Automático</option>
-                    </select>
-                </label>
-                <button class="button button-primary" type="submit">Aplicar filtros</button>
-                <button id="clear-filters" class="button button-ghost" type="button">Limpar</button>
-            </form>
+            <div class="panel">
+                <form id="filters" class="filters" aria-label="Filtros de triagem">
+                    <label>
+                        <span>Categoria</span>
+                        <select name="category">
+                            <option value="">Todas</option>
+                            <option value="INFORMATION">Informação</option>
+                            <option value="COMPLAINT">Reclamação</option>
+                            <option value="OTHER">Outro</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Status</span>
+                        <select name="status">
+                            <option value="">Todos</option>
+                            <option value="COLLECTING_INFORMATION">Coletando informações</option>
+                            <option value="QUALIFIED">Qualificado</option>
+                            <option value="WAITING_HUMAN">Aguardando humano</option>
+                            <option value="HUMAN_ACTIVE">Em atendimento</option>
+                            <option value="CLOSED">Encerrado</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Atendimento</span>
+                        <select name="requiresHuman">
+                            <option value="">Todos</option>
+                            <option value="true">Requer humano</option>
+                            <option value="false">Automático</option>
+                        </select>
+                    </label>
+                    <button class="button button-primary" type="submit">Aplicar filtros</button>
+                    <button id="clear-filters" class="button button-ghost" type="button">Limpar</button>
+                </form>
 
-            <div id="feedback" class="feedback" role="status" aria-live="polite">Carregando triagens...</div>
+                <div id="feedback" class="feedback" role="status" aria-live="polite">Carregando triagens...</div>
 
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                    <tr>
-                        <th>Cliente</th>
-                        <th>Assunto</th>
-                        <th>Categoria</th>
-                        <th>Prioridade</th>
-                        <th>Status</th>
-                        <th class="actions-column">Ação</th>
-                    </tr>
-                    </thead>
-                    <tbody id="triage-rows"></tbody>
-                </table>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Assunto</th>
+                            <th>Categoria</th>
+                            <th>Prioridade</th>
+                            <th>Status</th>
+                            <th class="actions-column">Ação</th>
+                        </tr>
+                        </thead>
+                        <tbody id="triage-rows"></tbody>
+                    </table>
+                </div>
             </div>
         </section>
     </main>
@@ -166,7 +202,9 @@
                 <p class="eyebrow">Atendimento humano</p>
                 <h2 id="dialog-title">Assumir conversa</h2>
             </div>
-            <button id="dialog-close" class="icon-button" type="button" aria-label="Fechar">×</button>
+            <button id="dialog-close" class="icon-button" type="button" aria-label="Fechar">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
         </div>
         <p id="dialog-context" class="dialog-context"></p>
         <label id="dialog-field">
