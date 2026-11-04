@@ -216,6 +216,8 @@ function openAction(action, triage) {
     elements.dialogError.hidden = true;
     elements.dialogContext.textContent = `${triage.customerName || triage.customerPhone} · ${triage.subject || triage.customerNeed || "Sem assunto"}`;
     elements.dialogField.hidden = action === "close";
+    elements.dialogInput.disabled = action === "close";
+    elements.dialogInput.required = action !== "close";
     elements.dialogInput.value = "";
 
     if (action === "claim") {
