@@ -1,5 +1,6 @@
 package com.chatbot.whatsapp.integration.whatsapp;
 
+import com.chatbot.whatsapp.util.PhoneNumbers;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,9 +41,10 @@ public class WhatsAppConfigurationValidator {
         }
     }
 
+    /** Mesma regra usada para montar o link wa.me do botao de contato. */
     private void requirePhone(String value, List<String> missing) {
-        if (value == null || !value.matches("\\d{8,15}")) {
-            missing.add("WHATSAPP_CONTACT_PHONE (8 a 15 digitos)");
+        if (PhoneNumbers.normalize(value).isEmpty()) {
+            missing.add("WHATSAPP_CONTACT_PHONE (numero com pais e DDD, ex.: 5511999999999)");
         }
     }
 }

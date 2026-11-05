@@ -9,10 +9,14 @@ import com.chatbot.whatsapp.entity.enums.MessageStatus;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppClient;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppSendResult;
+import com.chatbot.whatsapp.service.chatbot.BotDecision;
 import com.chatbot.whatsapp.service.chatbot.ChatIntent;
-import com.chatbot.whatsapp.service.chatbot.GeneratedReply;
 import com.chatbot.whatsapp.service.chatbot.IntelligentResponseService;
 import com.chatbot.whatsapp.service.chatbot.IntentClassifier;
+import com.chatbot.whatsapp.service.triage.ConversationHandoffProperties;
+import com.chatbot.whatsapp.service.triage.HandoffReason;
+import com.chatbot.whatsapp.service.triage.HumanHandoffService;
+import com.chatbot.whatsapp.service.triage.HumanRequestDetector;
 import com.chatbot.whatsapp.service.triage.InformationCollectionService;
 import com.chatbot.whatsapp.service.triage.TriageCollectionResult;
 import com.chatbot.whatsapp.service.triage.ComplaintDetector;
@@ -33,9 +37,29 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Esta e a camada de "regra de negocio" mencionada no README: nenhuma
  * dessas decisoes fica no controller.</p>
+ *
+ * <p>Ordem das decisoes para uma conversa operada pelo bot:</p>
+ * <ol>
+ *   <li>reclamacao detectada por palavras-chave: fila humana com prioridade alta;</li>
+ *   <li>pedido explicito de atendente: fila humana;</li>
+ *   <li>primeira mensagem: o assistente virtual (se ligado) pode encaminhar direto;</li>
+ *   <li>coleta guiada de nome, empresa e assunto (deterministica);</li>
+ *   <li>mensagens livres: o assistente virtual responde, pede detalhes ou encaminha;
+ *       sem ele, vale o classificador local. Respostas seguidas sem solucao levam a
+ *       um atendente.</li>
+ * </ol>
+ *
+ * <p>O cliente fica bloqueado durante todo o processamento (ver
+ * {@link CustomerService#findOrCreateByPhone(String)}): o bot nunca responde ao
+ * mesmo tempo que um atendente assume a conversa.</p>
  */
 @Service
 public class MessageProcessingService {
+
+    private static final String UNSUPPORTED_REPLY =
+            "Recebi seu envio, mas por aqui eu consigo ler apenas mensagens de texto. "
+                    + "Pode me escrever o que você precisa?";
+    private static final int MAX_MESSAGE_TYPE_LENGTH = 30;
 
     private final CustomerService customerService;
     private final ConversationService conversationService;
@@ -46,6 +70,9 @@ public class MessageProcessingService {
     private final IntentClassifier intentClassifier;
     private final IntelligentResponseService intelligentResponseService;
     private final WhatsAppClient whatsAppClient;
+    private final HumanRequestDetector humanRequestDetector;
+    private final HumanHandoffService humanHandoffService;
+    private final ConversationHandoffProperties handoffProperties;
 
     public MessageProcessingService(CustomerService customerService,
                                      ConversationService conversationService,
@@ -55,7 +82,10 @@ public class MessageProcessingService {
                                      ComplaintEscalationService complaintEscalationService,
                                      IntentClassifier intentClassifier,
                                      IntelligentResponseService intelligentResponseService,
-                                     WhatsAppClient whatsAppClient) {
+                                     WhatsAppClient whatsAppClient,
+                                     HumanRequestDetector humanRequestDetector,
+                                     HumanHandoffService humanHandoffService,
+                                     ConversationHandoffProperties handoffProperties) {
         this.customerService = customerService;
         this.conversationService = conversationService;
         this.messageService = messageService;
@@ -65,6 +95,9 @@ public class MessageProcessingService {
         this.intentClassifier = intentClassifier;
         this.intelligentResponseService = intelligentResponseService;
         this.whatsAppClient = whatsAppClient;
+        this.humanRequestDetector = humanRequestDetector;
+        this.humanHandoffService = humanHandoffService;
+        this.handoffProperties = handoffProperties;
     }
 
     @Transactional
@@ -96,8 +129,7 @@ public class MessageProcessingService {
 
         Message inboundMessage = messageService.recordInbound(conversation, request.message(), externalId);
 
-        if (conversation.getStatus() == ConversationStatus.WAITING_HUMAN
-                || conversation.getStatus() == ConversationStatus.HUMAN_ACTIVE) {
+        if (isWithHumanTeam(conversation)) {
             messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
             conversationService.touch(conversation, "HUMAN_QUEUE_MESSAGE");
             return new WhatsAppWebhookResponse(
@@ -109,41 +141,17 @@ public class MessageProcessingService {
             );
         }
 
-        String reply;
-        String context;
-        if (complaintDetector.isComplaint(request.message())) {
-            complaintEscalationService.escalate(conversation, request.message());
-            reply = ComplaintEscalationService.HANDOFF_REPLY;
-            context = "COMPLAINT_ESCALATED";
-        } else {
-            Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
-                    conversation,
-                    customer,
-                    request.message()
-            );
-            if (collectionResult.isPresent()) {
-                TriageCollectionResult result = collectionResult.get();
-                reply = result.reply();
-                context = result.context();
-            } else {
-                ChatIntent intent = intentClassifier.classify(request.message());
-                GeneratedReply generatedReply = intelligentResponseService.generateReply(
-                        request.message(), intent, customer, conversation.getChatbot()
-                );
-                reply = generatedReply.text();
-                context = generatedReply.context();
-            }
-        }
+        BotTurn turn = decideTurn(conversation, customer, request.message(), inboundMessage);
 
         messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
-        conversationService.touch(conversation, context);
+        conversationService.touch(conversation, turn.context());
 
         WhatsAppSendResult sendResult = sendToWhatsApp
-                ? whatsAppClient.sendMessage(customer.getPhoneNumber(), reply)
+                ? whatsAppClient.sendMessage(customer.getPhoneNumber(), turn.reply())
                 : WhatsAppSendResult.sent(null);
         messageService.recordOutbound(
                 conversation,
-                reply,
+                turn.reply(),
                 sendResult.sent() ? MessageStatus.SENT : MessageStatus.FAILED,
                 sendResult.providerMessageId()
         );
@@ -152,34 +160,111 @@ public class MessageProcessingService {
                 conversation.getId(),
                 customer.getPhoneNumber(),
                 request.message(),
-                reply,
+                turn.reply(),
                 Instant.now()
         );
+    }
+
+    private BotTurn decideTurn(Conversation conversation, Customer customer, String message, Message inbound) {
+        if (complaintDetector.isComplaint(message)) {
+            complaintEscalationService.escalate(conversation, message);
+            return new BotTurn(ComplaintEscalationService.HANDOFF_REPLY, "COMPLAINT_ESCALATED");
+        }
+        if (humanRequestDetector.isHumanRequest(message)) {
+            return handoff(conversation, message, HandoffReason.CUSTOMER_REQUEST);
+        }
+
+        if (!informationCollectionService.hasStarted(conversation)) {
+            Optional<HandoffReason> firstMessageHandoff = intelligentResponseService.handoffOnFirstMessage(
+                    conversation, customer, message, inbound.getId());
+            if (firstMessageHandoff.isPresent()) {
+                return handoff(conversation, message, firstMessageHandoff.get());
+            }
+        }
+
+        Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
+                conversation,
+                customer,
+                message
+        );
+        if (collectionResult.isPresent()) {
+            TriageCollectionResult result = collectionResult.get();
+            return new BotTurn(result.reply(), result.context());
+        }
+
+        ChatIntent intent = intentClassifier.classify(message);
+        BotDecision decision = intelligentResponseService.decide(
+                conversation, customer, message, intent, inbound.getId());
+        return switch (decision.action()) {
+            case HANDOFF -> handoff(conversation, message, decision.handoffReason());
+            case RESOLVE -> {
+                conversation.resetUnresolvedBotAttempts();
+                yield new BotTurn(decision.reply(), decision.context());
+            }
+            case ASK_MORE -> {
+                int attempts = conversation.registerUnresolvedBotAttempt();
+                yield attempts >= handoffProperties.effectiveMaxUnresolvedAttempts()
+                        ? handoff(conversation, message, HandoffReason.UNRESOLVED_ATTEMPTS)
+                        : new BotTurn(decision.reply(), decision.context());
+            }
+        };
+    }
+
+    private BotTurn handoff(Conversation conversation, String message, HandoffReason reason) {
+        String reply = humanHandoffService.handoff(conversation, reason, message);
+        return new BotTurn(reply, reason == HandoffReason.COMPLAINT ? "COMPLAINT_ESCALATED" : "HUMAN_HANDOFF");
     }
 
     /**
      * Registra uma midia recebida sem usa-la como resposta da coleta guiada.
      * O id externo fica persistido, portanto uma reentrega da Meta nao gera
      * outro aviso para o cliente.
+     *
+     * <p>Se a conversa estiver com a equipe humana, o aviso automatico nao e
+     * enviado: quem responde e o atendente.</p>
      */
     @Transactional
     public void processUnsupported(String phone, String externalId, String type) {
         Customer customer = customerService.findOrCreateByPhone(phone);
         Conversation conversation = conversationService.getOrCreateActiveConversation(customer);
-        String inboundDescription = "[Mensagem do WhatsApp do tipo: " + type + "]";
+        String inboundDescription = "[Mensagem do WhatsApp do tipo: " + describeType(type) + "]";
         Message inboundMessage = messageService.recordInbound(
                 conversation, inboundDescription, externalId);
         messageService.updateStatus(inboundMessage, MessageStatus.PROCESSED);
 
-        String reply = "Recebi seu envio, mas por aqui eu consigo ler apenas mensagens de texto. "
-                + "Pode me escrever o que você precisa?";
-        WhatsAppSendResult sendResult = whatsAppClient.sendMessage(phone, reply);
+        if (isWithHumanTeam(conversation)) {
+            conversationService.touch(conversation, "HUMAN_QUEUE_MESSAGE");
+            return;
+        }
+
+        WhatsAppSendResult sendResult = whatsAppClient.sendMessage(phone, UNSUPPORTED_REPLY);
         messageService.recordOutbound(
                 conversation,
-                reply,
+                UNSUPPORTED_REPLY,
                 sendResult.sent() ? MessageStatus.SENT : MessageStatus.FAILED,
                 sendResult.providerMessageId()
         );
         conversationService.touch(conversation, "UNSUPPORTED_WHATSAPP_MESSAGE");
+    }
+
+    /** O bot fica pausado somente nesta conversa enquanto ela estiver com a equipe humana. */
+    private boolean isWithHumanTeam(Conversation conversation) {
+        return conversation.getStatus() == ConversationStatus.WAITING_HUMAN
+                || conversation.getStatus() == ConversationStatus.HUMAN_ACTIVE;
+    }
+
+    /** O tipo vem do provedor: so letras e sublinhado, com tamanho limitado. */
+    private String describeType(String type) {
+        if (type == null || type.isBlank()) {
+            return "desconhecido";
+        }
+        String clean = type.replaceAll("[^A-Za-z_]", "");
+        if (clean.isEmpty()) {
+            return "desconhecido";
+        }
+        return clean.length() > MAX_MESSAGE_TYPE_LENGTH ? clean.substring(0, MAX_MESSAGE_TYPE_LENGTH) : clean;
+    }
+
+    private record BotTurn(String reply, String context) {
     }
 }

@@ -11,5 +11,9 @@ public enum MessageStatus {
     /** Mensagem outbound confirmada pelo provedor (ou pelo mock local). */
     SENT,
     /** Falha ao processar ou enviar a mensagem. */
-    FAILED
+    FAILED,
+    /** Mensagem outbound entregue ao aparelho do cliente (status informado pela Meta). */
+    DELIVERED,
+    /** Mensagem outbound lida pelo cliente (status informado pela Meta). */
+    READ
 }

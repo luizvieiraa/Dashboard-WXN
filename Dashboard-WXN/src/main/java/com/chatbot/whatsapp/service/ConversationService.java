@@ -47,6 +47,13 @@ public class ConversationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Conversa nao encontrada: id=" + id));
     }
 
+    /** Id do cliente da conversa, usado para bloquear o cliente antes de altera-la. */
+    @Transactional(readOnly = true)
+    public Long findCustomerId(Long conversationId) {
+        return conversationRepository.findCustomerIdById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversa nao encontrada: id=" + conversationId));
+    }
+
     @Transactional
     public void touch(Conversation conversation, String lastContext) {
         conversation.recordInteraction(lastContext);

@@ -81,9 +81,24 @@ termos de reclamação ou um pedido explícito por atendente, a conversa passa
 para `WAITING_HUMAN`, a triagem recebe categoria `COMPLAINT`, prioridade
 `HIGH` e `requiresHuman=true`.
 
+Pedidos para falar com uma pessoa escritos de outras formas ("quero falar com
+um humano", "atendimento humano") também encaminham a conversa para
+`WAITING_HUMAN`, com `requiresHuman=true`, preservando a categoria da triagem
+(ou `OTHER`, se ela ainda não existir). O mesmo acontece depois de
+`CONVERSATION_MAX_UNRESOLVED_ATTEMPTS` respostas automáticas seguidas sem
+solução. Nesses casos, `botReply` traz a mensagem de encaminhamento e o
+`context` da conversa fica `HUMAN_HANDOFF`.
+
 Depois que a triagem termina, respostas gerais podem ser geradas por IA
 quando `AI_ENABLED=true`. Se o provedor falhar ou estiver desabilitado, a
 resposta local baseada em intenção é usada automaticamente.
+
+Com o assistente virtual ligado, a primeira mensagem também é classificada e
+pode ir direto para a fila humana (reclamação, pedido de atendente ou assunto
+sensível). Depois da triagem, o assistente responde (`context=AI_RESPONSE`),
+pede mais informações (`context=AI_ASK_MORE`) ou encaminha para um atendente;
+com confiança abaixo de `AI_MIN_CONFIDENCE`, a conversa sempre vai para a fila
+humana. Detalhes no README, seção 14.1.
 
 * **Erros**:
   * `400 Bad Request` - `phone` ou `message` ausentes/inválidos (corpo no formato padrão de erro, ver abaixo).
@@ -164,11 +179,18 @@ conectado.
   mensagem, porque a Meta reentrega qualquer notificação que não receba
   `200` e desativa o webhook após falhas repetidas. Isso acontece quando:
 
-  * a notificação é de **status de entrega** (`sent`/`delivered`/`read`) -
-    ignorada, pois não é mensagem de usuário;
+  * a notificação é de **status de entrega** (`sent`/`delivered`/`read`/`failed`) -
+    não gera mensagem de usuário; o status é aplicado à mensagem enviada
+    correspondente, identificada pelo `statuses[].id` (o `wamid` gravado em
+    `messages.external_id`). O status só avança (`SENT` → `DELIVERED` →
+    `READ`); `FAILED` só vale antes da entrega. Status de mensagens
+    desconhecidas são ignorados;
   * a mensagem **não é de texto** (imagem, áudio, documento, localização) -
     o usuário recebe um aviso pedindo que escreva em texto, e nada é
-    gravado, para não contaminar a coleta da triagem;
+    gravado, para não contaminar a coleta da triagem. Na implementação atual,
+    o evento é registrado no histórico como `[Mensagem do WhatsApp do tipo: ...]`
+    (para auditoria e deduplicação), sem avançar a triagem; se a conversa
+    estiver com a equipe humana, o aviso automático não é enviado;
   * a mensagem é uma **reentrega** de algo já processado (deduplicação por
     `messages[].id`, guardado em `messages.external_id`);
   * o payload é **inválido ou irreconhecível** - registrado em log.
@@ -176,6 +198,9 @@ conectado.
 * **Erros**:
   * `403 Forbidden` - assinatura `X-Hub-Signature-256` ausente ou inválida
     (somente quando `WHATSAPP_APP_SECRET` está configurado).
+  * `500 Internal Server Error` - alguma mensagem ou status do lote não pôde
+    ser gravado. A Meta reentrega a notificação; o que já foi processado é
+    descartado pela deduplicação.
 
 * **Processamento**: cada mensagem de texto é encaminhada para o mesmo
   `MessageProcessingService` usado pelo endpoint do simulador, portanto
@@ -234,6 +259,11 @@ para `HUMAN_ACTIVE`. Body: `{"attendant":"Carlos Lima"}`.
 Registra e envia uma resposta do atendente em uma conversa `HUMAN_ACTIVE`.
 Body: `{"message":"Olá, vou analisar o ocorrido."}`.
 
+Se a última mensagem do cliente tiver mais de 24 horas, a resposta não é
+enviada nem gravada e a API devolve `409 Conflict` explicando que a janela de
+atendimento do WhatsApp foi encerrada (fora dela a Meta só aceita templates
+aprovados, que este projeto não usa).
+
 ### `POST /api/v1/conversations/{id}/close`
 
 Encerra a conversa e registra `closedAt`. Uma mensagem posterior do cliente
@@ -259,6 +289,32 @@ ordenado por prioridade e depois pela interação mais recente.
 Exemplo para a fila de reclamações:
 
 `GET /api/v1/dashboard/triages?category=COMPLAINT&status=WAITING_HUMAN&requiresHuman=true`
+
+Cada item traz também `customerWhatsAppUrl`: o link
+`https://wa.me/<telefone>` para continuar a conversa com o cliente no WhatsApp,
+com o telefone normalizado para o formato internacional (somente dígitos) e
+sem texto pré-preenchido. Quando o telefone está ausente ou é inválido, o
+campo vem `null` e o dashboard não abre o link.
+
+```json
+{
+  "triageId": 7,
+  "conversationId": 12,
+  "customerPhone": "5511999999999",
+  "conversationStatus": "WAITING_HUMAN",
+  "customerWhatsAppUrl": "https://wa.me/5511999999999"
+}
+```
+
+(trecho; os demais campos seguem como antes)
+
+## Status das mensagens
+
+`RECEIVED` e `PROCESSED` valem para mensagens recebidas. Para mensagens
+enviadas: `SENT` (aceita pela Meta ou pelo envio simulado), `DELIVERED`
+(entregue no aparelho do cliente), `READ` (lida) e `FAILED` (recusada pela
+Meta ou não entregue). `DELIVERED` e `READ` são preenchidos pelas notificações
+de status do webhook da Meta.
 
 ---
 
