@@ -4,6 +4,7 @@ import com.chatbot.whatsapp.entity.Triage;
 import com.chatbot.whatsapp.entity.enums.ConversationStatus;
 import com.chatbot.whatsapp.entity.enums.TriageCategory;
 import com.chatbot.whatsapp.entity.enums.TriagePriority;
+import com.chatbot.whatsapp.util.PhoneNumbers;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
@@ -23,7 +24,11 @@ public record DashboardTriageResponse(
         ConversationStatus conversationStatus,
         String assignedTo,
         Instant lastInteractionAt,
-        Instant updatedAt
+        Instant updatedAt,
+        @Schema(description = "Link https://wa.me/<telefone> para continuar a conversa com o cliente no "
+                + "WhatsApp; nulo quando o telefone estiver ausente ou for inválido",
+                example = "https://wa.me/5511999999999")
+        String customerWhatsAppUrl
 ) {
     public static DashboardTriageResponse fromEntity(Triage triage) {
         var conversation = triage.getConversation();
@@ -43,7 +48,8 @@ public record DashboardTriageResponse(
                 conversation.getStatus(),
                 conversation.getAssignedTo(),
                 conversation.getLastInteractionAt(),
-                triage.getUpdatedAt()
+                triage.getUpdatedAt(),
+                PhoneNumbers.whatsAppLink(customer.getPhoneNumber()).orElse(null)
         );
     }
 }

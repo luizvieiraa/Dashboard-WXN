@@ -43,6 +43,15 @@ public class InformationCollectionService {
     }
 
     /**
+     * Indica se a coleta guiada ja comecou nesta conversa. Enquanto nao comecou,
+     * a mensagem recebida e a primeira da conversa (a necessidade inicial).
+     */
+    @Transactional(readOnly = true)
+    public boolean hasStarted(Conversation conversation) {
+        return triageRepository.findByConversationId(conversation.getId()).isPresent();
+    }
+
+    /**
      * Processa uma etapa de coleta. Retorna vazio quando a triagem ja esta
      * completa e a mensagem deve seguir para o chatbot normal.
      */

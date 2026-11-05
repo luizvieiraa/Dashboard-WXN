@@ -726,7 +726,7 @@ tbody tr:hover { background: rgba(31, 65, 108, 0.22); }
 .status-closed { --status-color: #6f7f95; }
 
 td.actions, .actions-column { text-align: right; }
-div.actions { display: inline-flex; gap: 8px; justify-content: flex-end; }
+div.actions { display: inline-flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 div.actions > span { color: var(--text-subtle); }
 
 .actions .button { min-height: 34px; padding: 0 12px; border-radius: 10px; font-size: 0.78rem; }
@@ -829,6 +829,10 @@ dialog::backdrop { background: rgba(3, 9, 18, 0.7); backdrop-filter: blur(6px); 
     box-shadow: 0 0 0 4px rgba(88, 210, 157, 0.16);
     content: "";
 }
+
+/* Avisos que impedem uma ação (ex.: telefone inválido) usam o mesmo toast em vermelho */
+.toast.toast-error { border-color: rgba(217, 75, 85, 0.35); }
+.toast.toast-error::before { background: var(--red-light); box-shadow: 0 0 0 4px rgba(217, 75, 85, 0.16); }
 
 @keyframes toast-in {
     from { opacity: 0; transform: translateY(10px); }

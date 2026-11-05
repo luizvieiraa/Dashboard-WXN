@@ -5,7 +5,10 @@ import com.chatbot.whatsapp.entity.Message;
 import com.chatbot.whatsapp.entity.enums.MessageDirection;
 import com.chatbot.whatsapp.entity.enums.MessageStatus;
 import com.chatbot.whatsapp.repository.MessageRepository;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,5 +79,14 @@ public class MessageService {
     @Transactional(readOnly = true)
     public List<Message> listByConversation(Long conversationId) {
         return messageRepository.findByConversationIdOrderByCreatedAtAscIdAsc(conversationId);
+    }
+
+    /** Ultimas {@code limit} mensagens da conversa, em ordem cronologica. */
+    @Transactional(readOnly = true)
+    public List<Message> recentMessages(Long conversationId, int limit) {
+        List<Message> chronological = new ArrayList<>(
+                messageRepository.findByConversationIdOrderByCreatedAtDescIdDesc(conversationId, Limit.of(limit)));
+        Collections.reverse(chronological);
+        return chronological;
     }
 }

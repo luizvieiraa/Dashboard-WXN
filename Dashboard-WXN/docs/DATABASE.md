@@ -12,6 +12,19 @@ A migração converte `assigned_to` e `assigned_at` das conversas existentes
 em operadores e atendimentos, preservando as datas de encerramento.
 As colunas antigas continuam disponíveis para compatibilidade com a API.
 
+## Migração V6: tentativas sem solução
+
+`V6__add_conversation_unresolved_bot_attempts.sql` adiciona
+`conversations.unresolved_bot_attempts` (`INTEGER NOT NULL DEFAULT 0`). A
+coluna conta as respostas automáticas seguidas sem solução (pedido de mais
+informações ou intenção não reconhecida) e volta a zero quando o bot resolve
+uma mensagem. Ao atingir `CONVERSATION_MAX_UNRESOLVED_ATTEMPTS`, a conversa é
+encaminhada para atendimento humano. A alteração é aditiva: conversas
+existentes começam com zero.
+
+Os status `DELIVERED` e `READ` das mensagens não exigiram migração: a coluna
+`messages.status` é `VARCHAR(20)`, sem restrição de valores.
+
 ## Escolha: PostgreSQL
 
 PostgreSQL foi escolhido (confirmando a preferência inicial do time) pelos
@@ -77,6 +90,7 @@ todas estiverem `CLOSED`, uma nova é criada com status `BOT_ACTIVE`.
 | assigned_to | VARCHAR(255) | atendente responsável, quando assumida |
 | assigned_at | TIMESTAMP | momento em que o atendente assumiu |
 | closed_at | TIMESTAMP | momento do encerramento |
+| unresolved_bot_attempts | INTEGER | respostas automáticas seguidas sem solução (V6, padrão 0) |
 
 Estados disponíveis: `BOT_ACTIVE`, `COLLECTING_INFORMATION`, `QUALIFIED`,
 `WAITING_HUMAN`, `HUMAN_ACTIVE` e `CLOSED`. A regra de encerramento
@@ -93,8 +107,8 @@ dentro de uma conversa.
 | conversation_id | BIGINT | FK -> conversations.id |
 | direction | VARCHAR(10) | `INBOUND` (cliente -> bot) ou `OUTBOUND` (bot -> cliente) |
 | content | TEXT | conteúdo da mensagem |
-| status | VARCHAR(20) | `RECEIVED`, `PROCESSED`, `SENT` ou `FAILED` |
-| external_id | VARCHAR(255) | id da mensagem no provedor externo (WhatsApp), preenchido quando a integração real existir |
+| status | VARCHAR(20) | `RECEIVED`, `PROCESSED`, `SENT` ou `FAILED`; mensagens enviadas também podem ficar `DELIVERED` ou `READ`, conforme os status informados pela Meta |
+| external_id | VARCHAR(255) | id da mensagem no provedor externo (WhatsApp), preenchido quando a integração real existir; índice único (V4). Nas mensagens enviadas, é o `wamid` usado para aplicar os status de entrega |
 | created_at | TIMESTAMP | data/hora da mensagem |
 
 ### `triages`
@@ -136,7 +150,9 @@ O schema é versionado com Flyway (`src/main/resources/db/migration`).
 `V1__init.sql` cria o schema inicial. `V2__add_triage_domain.sql` adiciona
 os campos de perfil do cliente, os novos estados de conversa e as tabelas
 de triagem. `V3__add_human_attendance_fields.sql` registra atribuição e
-encerramento do atendimento humano. O Hibernate roda em modo `validate`: ele **não** gera
+encerramento do atendimento humano. `V4` cria o índice único de
+`messages.external_id`, `V5` adiciona chatbot, atendentes e atendimentos e
+`V6` adiciona o contador de tentativas sem solução. O Hibernate roda em modo `validate`: ele **não** gera
 nem altera o schema, apenas confere se as entidades batem com as tabelas
 já criadas pelo Flyway. Isso evita divergência entre o que o código espera
 e o que realmente existe no banco, e mantém um histórico auditável de

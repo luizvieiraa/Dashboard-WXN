@@ -229,6 +229,74 @@ class MetaWebhookPayloadParserTest {
     }
 
     @Test
+    void deveExtrairStatusDeEntregaELeitura() throws Exception {
+        String payload = """
+                {
+                  "object": "whatsapp_business_account",
+                  "entry": [{
+                    "changes": [{
+                      "field": "messages",
+                      "value": {
+                        "messaging_product": "whatsapp",
+                        "statuses": [
+                          {"id": "wamid.ENVIADA", "status": "delivered", "timestamp": "1750263773",
+                           "recipient_id": "5511988887777", "conversation": {"id": "abc"}, "pricing": {}},
+                          {"id": "wamid.ENVIADA", "status": "READ", "timestamp": "1750263800",
+                           "recipient_id": "5511988887777"}
+                        ]
+                      }
+                    }]
+                  }]
+                }
+                """;
+
+        List<WhatsAppStatusUpdate> statuses =
+                parser.parseStatuses(objectMapper.readValue(payload, MetaWebhookPayload.class));
+
+        assertThat(statuses).extracting(WhatsAppStatusUpdate::status).containsExactly("delivered", "read");
+        assertThat(statuses.get(0).messageId()).isEqualTo("wamid.ENVIADA");
+        assertThat(statuses.get(0).timestamp()).isEqualTo(Instant.ofEpochSecond(1750263773L));
+        assertThat(statuses.get(0).errorCode()).isNull();
+    }
+
+    @Test
+    void deveExtrairCodigoDoErroQuandoOEnvioFalhar() throws Exception {
+        String payload = """
+                {"entry": [{"changes": [{"value": {"statuses": [{
+                  "id": "wamid.FALHOU", "status": "failed", "timestamp": "1750263773",
+                  "recipient_id": "5511988887777",
+                  "errors": [{"code": 131047, "title": "Re-engagement message",
+                              "error_data": {"details": "Message failed to send"}}]
+                }]}}]}]}
+                """;
+
+        List<WhatsAppStatusUpdate> statuses =
+                parser.parseStatuses(objectMapper.readValue(payload, MetaWebhookPayload.class));
+
+        assertThat(statuses).hasSize(1);
+        assertThat(statuses.get(0).status()).isEqualTo(WhatsAppStatusUpdate.FAILED);
+        assertThat(statuses.get(0).errorCode()).isEqualTo(131047);
+        assertThat(statuses.get(0).errorTitle()).isEqualTo("Re-engagement message");
+    }
+
+    @Test
+    void deveIgnorarStatusSemIdOuSemValor() throws Exception {
+        String payload = """
+                {"entry": [{"changes": [{"value": {"statuses": [
+                  {"status": "delivered"}, {"id": "wamid.X"}, null
+                ]}}]}]}
+                """;
+
+        assertThat(parser.parseStatuses(objectMapper.readValue(payload, MetaWebhookPayload.class))).isEmpty();
+        assertThat(parser.parseStatuses(null)).isEmpty();
+        // Mensagens de usuario nao geram status.
+        assertThat(parser.parseStatuses(objectMapper.readValue("""
+                {"entry": [{"changes": [{"value": {"messages": [{"from": "5511988887777",
+                  "id": "wamid.M", "type": "text", "text": {"body": "oi"}}]}}]}]}
+                """, MetaWebhookPayload.class))).isEmpty();
+    }
+
+    @Test
     void deveIgnorarCamposDesconhecidosDaMeta() throws Exception {
         String payload = """
                 {

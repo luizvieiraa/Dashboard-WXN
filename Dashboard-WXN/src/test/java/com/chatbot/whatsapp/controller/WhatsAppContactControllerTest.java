@@ -21,6 +21,14 @@ class WhatsAppContactControllerTest {
     }
 
     @Test
+    void deveNormalizarNumeroDeContatoFormatado() {
+        WhatsAppContactController controller =
+                new WhatsAppContactController(properties(true, "+55 (11) 99999-9999"));
+
+        assertThat(controller.contact().url()).startsWith("https://wa.me/5511999999999?text=");
+    }
+
+    @Test
     void naoDeveExporLinkSemIntegracaoAtivaOuNumeroValido() {
         assertThat(new WhatsAppContactController(properties(false, "5511999999999"))
                 .contact().available()).isFalse();

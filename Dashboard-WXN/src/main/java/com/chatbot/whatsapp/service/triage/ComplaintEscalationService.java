@@ -18,6 +18,9 @@ public class ComplaintEscalationService {
             "Sinto muito que você tenha passado por isso. Vou pausar o atendimento automático e chamar uma pessoa "
                     + "da equipe para cuidar do seu caso com atenção. Você pode continuar enviando detalhes por aqui.";
 
+    /** Tamanho da coluna {@code triages.subject}; o texto completo fica em customer_need e summary. */
+    private static final int MAX_SUBJECT_LENGTH = 255;
+
     private final TriageRepository triageRepository;
     private final ConversationService conversationService;
 
@@ -39,11 +42,18 @@ public class ComplaintEscalationService {
         triage.setCategory(TriageCategory.COMPLAINT);
         triage.setPriority(TriagePriority.HIGH);
         triage.setRequiresHuman(true);
-        triage.setSubject(normalizedComplaint);
+        triage.setSubject(truncate(normalizedComplaint, MAX_SUBJECT_LENGTH));
         triage.setSummary("Reclamação encaminhada para atendimento humano: " + normalizedComplaint);
         triage.getMissingInformation().clear();
 
         conversationService.changeStatus(conversation, ConversationStatus.WAITING_HUMAN);
         return triageRepository.save(triage);
+    }
+
+    static String truncate(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength - 1).stripTrailing() + "…";
     }
 }

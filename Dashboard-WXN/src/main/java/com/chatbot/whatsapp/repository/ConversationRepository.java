@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
@@ -24,4 +26,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     @EntityGraph(attributePaths = "customer")
     Optional<Conversation> findOneById(Long id);
+
+    /** Somente o id do cliente, sem carregar a conversa na sessao. */
+    @Query("select c.customer.id from Conversation c where c.id = :id")
+    Optional<Long> findCustomerIdById(@Param("id") Long id);
 }

@@ -83,9 +83,11 @@ com.chatbot.whatsapp
 │   ├── request/                # payloads recebidos pela API
 │   └── response/                # payloads devolvidos pela API
 ├── integration/
-│   └── whatsapp/                # tudo que conhece o formato da Meta: envio, parsing do webhook e assinatura
+│   ├── whatsapp/                # tudo que conhece o formato da Meta: envio, parsing do webhook e assinatura
+│   └── ai/                      # provedor do assistente virtual: cliente HTTP, prompt e base de conhecimento
 ├── config/                      # beans de configuração (ex.: OpenAPI/Swagger)
-└── exception/                   # exceções de negócio + tratamento centralizado (RestControllerAdvice)
+├── exception/                   # exceções de negócio + tratamento centralizado (RestControllerAdvice)
+└── util/                        # telefone (normalização, link wa.me, máscara) e descrição de erros sem dados pessoais
 ```
 
 Cada camada só conhece a camada imediatamente abaixo dela:
@@ -110,11 +112,17 @@ regra dentro do Controller" é resolvido colocando a orquestração em
    2. busca a conversa ativa do cliente ou cria uma nova (`ConversationService`);
    3. grava a mensagem recebida (`MessageService.recordInbound`);
    4. verifica primeiro se a mensagem indica uma reclamação; nesse caso,
-      interrompe a automação e envia a conversa para a fila humana;
+      interrompe a automação e envia a conversa para a fila humana; pedidos
+      explícitos de atendente (`HumanRequestDetector`) seguem o mesmo caminho
+      (`HumanHandoffService`);
    5. inicia ou continua a coleta de nome, empresa e assunto
-      (`InformationCollectionService`);
+      (`InformationCollectionService`); na primeira mensagem, com o
+      assistente virtual ligado, ele pode encaminhar a conversa direto para a
+      fila humana;
    6. quando a coleta já terminou, classifica a intenção do texto e usa a
-      resposta do chatbot atual;
+      resposta do chatbot atual; com o assistente virtual, a decisão é
+      responder, pedir detalhes ou encaminhar, e respostas seguidas sem
+      solução também encaminham (ver "Respostas com IA e fallback");
    7. ao completar os campos, gera um resumo e marca a conversa como `QUALIFIED`;
    8. marca a mensagem recebida como processada e grava a mensagem de resposta;
    9. atualiza o "contexto" e o horário da última interação da conversa;
@@ -127,6 +135,16 @@ Enquanto a conversa estiver em `WAITING_HUMAN` ou `HUMAN_ACTIVE`, o webhook
 continua persistindo mensagens recebidas, mas não gera resposta automática.
 A equipe opera a fila pelos endpoints de assumir, responder e encerrar em
 `ConversationController` e `HumanAttendanceService`.
+
+**Concorrência entre bot e atendente.** O processamento de uma mensagem
+começa bloqueando a linha do cliente (`SELECT ... FOR UPDATE`, em
+`CustomerService.findOrCreateByPhone`) e só a libera no fim da transação,
+depois de enviar a resposta. Assumir, responder e encerrar bloqueiam o mesmo
+cliente antes de ler a conversa (`HumanAttendanceService`). Com isso, duas
+mensagens do mesmo cliente nunca são processadas ao mesmo tempo, e uma
+resposta automática nunca é enviada depois de a conversa ter sido encaminhada
+ou assumida. O teste `BotAndAttendantConcurrencyTest` reproduz essa corrida
+com duas threads.
 
 `DashboardController` expõe a visão de leitura usada pelo front-end.
 `DashboardService` consolida contagens e transforma `Triage` em
@@ -201,21 +219,58 @@ Pontos de desenho relevantes:
   ao provedor é registrada em log sem propagar - a mensagem do cliente já
   foi processada e persistida, e derrubar o fluxo faria a Meta reentregar.
 
+* **Status de entrega.** As notificações `statuses` do mesmo webhook são
+  lidas por `MetaWebhookPayloadParser.parseStatuses` e aplicadas por
+  `WhatsAppStatusService` à mensagem enviada com o mesmo `wamid`
+  (`SENT` → `DELIVERED` → `READ`, ou `FAILED`). O status só avança.
+* **Novas tentativas.** `MetaWhatsAppClient` repete o envio no máximo 3
+  vezes em falhas temporárias (`429`, `5xx`, códigos de limite da Meta e
+  falha de conexão antes do envio). Tempo esgotado depois do envio não é
+  repetido, para não duplicar a mensagem ao cliente.
+* **Janela de 24 horas.** `CustomerServiceWindow` impede que a resposta de um
+  atendente seja enviada mais de 24 horas depois da última mensagem do
+  cliente (a Meta exigiria template aprovado).
+
 Como consequência de `HumanAttendanceService.reply()` também usar
 `WhatsAppClient`, a resposta que um atendente escreve no dashboard chega ao
 WhatsApp do cliente sem nenhum código adicional.
+
+### Atendimento pelo próprio WhatsApp (botão "Ir para a conversa")
+
+O dashboard também permite continuar o atendimento fora dele. O botão
+**Ir para a conversa** (conversas `WAITING_HUMAN` e `HUMAN_ACTIVE`) abre
+`https://wa.me/<telefone do cliente>` em uma nova aba. Em `WAITING_HUMAN`, o
+dashboard primeiro assume a conversa pelo endpoint existente de
+`claim`, o que pausa o bot somente nela. O link é montado no backend
+(`DashboardTriageResponse.customerWhatsAppUrl`) a partir de
+`PhoneNumbers.whatsAppLink`, a função central de normalização de telefones,
+também usada pelo botão de contato e pela validação de
+`WHATSAPP_CONTACT_PHONE`. Se o telefone for inválido, o campo vem nulo e o
+dashboard mostra um aviso em vez de abrir um link quebrado.
+
+O link abre a conversa na conta de WhatsApp do atendente. As mensagens que ele
+enviar pelo aplicativo não passam pelo backend; as do cliente continuam
+chegando pelo webhook e sendo registradas no histórico da conversa.
 
 ### Limitações conhecidas
 
 * O processamento é **sincrônico**: o `200` só volta depois de persistir e
   enviar a resposta. Com a IA habilitada isso inclui o timeout do provedor
   (padrão 10s). Suficiente para o volume atual; um volume alto pediria
-  processar em background e responder `200` imediatamente.
+  processar em background e responder `200` imediatamente. Esse modelo foi
+  mantido porque o projeto não tem um mecanismo de processamento assíncrono
+  de mensagens, e responder `200` antes de gravar a mensagem tiraria da Meta
+  a reentrega que hoje cobre falhas internas. Uma evolução segura seria
+  gravar a mensagem recebida, responder `200` e processar a fila gravada em
+  segundo plano.
 * Somente mensagens de **texto** são interpretadas. Mídias recebem um aviso
-  pedindo texto e não geram registro.
+  pedindo texto e não geram registro. (Na implementação atual, a mídia é
+  registrada no histórico para auditoria e deduplicação, sem avançar a
+  triagem; o aviso não é enviado se a conversa estiver com a equipe humana.)
 * A Cloud API só permite mensagem livre dentro da **janela de 24h** após a
   última mensagem do usuário. Fora dela, a Meta exige *template* aprovado -
-  não implementado.
+  não implementado. As respostas do atendente são recusadas fora da janela
+  (`409`), em vez de falharem na Meta.
 
 ## Respostas com IA e fallback
 
@@ -229,6 +284,50 @@ preservando o atendimento mesmo quando o provedor estiver indisponível.
 
 O prompt proíbe inventar preços, prazos e políticas. Chaves e modelo são
 fornecidos apenas por variáveis de ambiente.
+
+### Assistente virtual: decisão estruturada
+
+Com `AI_ENABLED=true`, `IntelligentResponseService` deixa de pedir apenas um
+texto e passa a pedir uma decisão em JSON (imposta por JSON Schema estrito):
+intenção, ação (`RESOLVE`, `ASK_MORE`, `HANDOFF`), confiança, se o assunto é
+sensível e a resposta sugerida. A decisão final é tomada em código:
+
+```
+mensagem livre ──▶ AssistantContextBuilder ──▶ AiClient.decide ──▶ interpretação
+                   (dados mínimos, histórico      (OpenAiResponses    │
+                    limitado, sanitização)          Client)           ├─ confiança baixa ─────────────▶ fila humana
+                                                                      ├─ reclamação / pedido de pessoa
+                                                                      │  / assunto sensível ──────────▶ fila humana
+                                                                      ├─ resposta reprovada pelo
+                                                                      │  AssistantReplyGuard ─────────▶ fluxo local
+                                                                      ├─ ASK_MORE ──▶ conta tentativa sem solução
+                                                                      └─ RESOLVE ───▶ responde e zera as tentativas
+```
+
+* **Primeira mensagem**: o assistente só pode encaminhar (com confiança
+  mínima); senão, a coleta determinística de nome, empresa e assunto começa
+  normalmente.
+* **Tentativas sem solução**: `conversations.unresolved_bot_attempts` (V6)
+  conta respostas seguidas com `ASK_MORE` ou intenção local `UNKNOWN`. Ao
+  atingir `CONVERSATION_MAX_UNRESOLVED_ATTEMPTS`, a conversa vai para a fila
+  humana. A regra vale também sem o assistente virtual.
+* **Prompt e base de conhecimento** ficam em `src/main/resources/assistant/`
+  (`AssistantResources`), separados da lógica de negócio. A base vem vazia:
+  sem informações oficiais, o assistente não afirma nada sobre preços, prazos
+  ou políticas.
+* **Prompt injection**: os textos do cliente vão serializados em JSON dentro
+  de um bloco delimitado, separados das instruções, depois de passar por
+  `AssistantInputSanitizer` (remove caracteres invisíveis, neutraliza `<` e
+  `>`, omite e-mails e números longos, limita o tamanho). A resposta passa por
+  `AssistantReplyGuard`, que recusa links e valores em reais ausentes da base
+  de conhecimento e menções às marcações internas do prompt. A decisão do
+  modelo nunca dispara ações além de responder ou encaminhar para humano.
+* **Custo**: chamadas só na primeira mensagem e nas mensagens livres depois da
+  triagem (nunca nas respostas de nome/empresa/assunto), com histórico,
+  entrada e saída limitados.
+* **Falhas**: provedor desligado, timeout, erro HTTP, recusa do modelo, JSON
+  inválido ou resposta reprovada levam ao fluxo local, sem interromper o
+  atendimento.
 
 ## Ciclo de vida e inatividade
 

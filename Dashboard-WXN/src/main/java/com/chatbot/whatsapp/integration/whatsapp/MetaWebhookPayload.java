@@ -39,6 +39,18 @@ import java.util.List;
  * <p>Notificacoes de status de entrega (enviada/entregue/lida) chegam no mesmo
  * formato, mas com um array {@code statuses} em vez de {@code messages} - por
  * isso {@code messages} pode ser nulo.</p>
+ *
+ * <p>Formato de uma notificacao de status (o {@code id} e o {@code wamid} da
+ * mensagem enviada pelo backend):</p>
+ * <pre>
+ * "statuses": [{
+ *   "id": "wamid.HBgL...",
+ *   "status": "delivered",          // sent | delivered | read | failed
+ *   "timestamp": "1750263773",
+ *   "recipient_id": "5511999999999",
+ *   "errors": [{ "code": 131047, "title": "Re-engagement message" }]   // somente em failed
+ * }]
+ * </pre>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record MetaWebhookPayload(
@@ -59,7 +71,8 @@ public record MetaWebhookPayload(
             String messaging_product,
             Metadata metadata,
             List<Contact> contacts,
-            List<MessageNode> messages
+            List<MessageNode> messages,
+            List<StatusNode> statuses
     ) {
     }
 
@@ -87,5 +100,20 @@ public record MetaWebhookPayload(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Text(String body) {
+    }
+
+    /** Atualizacao de status de uma mensagem enviada pelo backend. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record StatusNode(
+            String id,
+            String status,
+            String timestamp,
+            String recipient_id,
+            List<ErrorNode> errors
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ErrorNode(Integer code, String title) {
     }
 }

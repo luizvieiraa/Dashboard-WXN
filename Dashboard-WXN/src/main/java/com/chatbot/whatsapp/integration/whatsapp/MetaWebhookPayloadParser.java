@@ -3,6 +3,7 @@ package com.chatbot.whatsapp.integration.whatsapp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -30,11 +31,48 @@ public class MetaWebhookPayloadParser {
      * @return lista possivelmente vazia (ex.: notificacao de status de entrega).
      */
     public List<WhatsAppInboundMessage> parse(MetaWebhookPayload payload) {
+        List<WhatsAppInboundMessage> messages = new ArrayList<>();
+        for (MetaWebhookPayload.Value value : values(payload)) {
+            messages.addAll(parseValue(value));
+        }
+        return messages;
+    }
+
+    /**
+     * Extrai as atualizacoes de status (enviada, entregue, lida, falha) das
+     * mensagens enviadas pelo backend.
+     *
+     * @return lista possivelmente vazia (ex.: notificacao com mensagens de usuario).
+     */
+    public List<WhatsAppStatusUpdate> parseStatuses(MetaWebhookPayload payload) {
+        List<WhatsAppStatusUpdate> updates = new ArrayList<>();
+        for (MetaWebhookPayload.Value value : values(payload)) {
+            if (value.statuses() == null) {
+                continue;
+            }
+            for (MetaWebhookPayload.StatusNode node : value.statuses()) {
+                if (node == null || isBlank(node.id()) || isBlank(node.status())) {
+                    log.warn("Status do webhook ignorado por falta de id ou de status");
+                    continue;
+                }
+                MetaWebhookPayload.ErrorNode error = firstError(node.errors());
+                updates.add(new WhatsAppStatusUpdate(
+                        node.id(),
+                        node.status().trim().toLowerCase(Locale.ROOT),
+                        parseTimestamp(node.timestamp()),
+                        error == null ? null : error.code(),
+                        error == null ? null : error.title()
+                ));
+            }
+        }
+        return updates;
+    }
+
+    private List<MetaWebhookPayload.Value> values(MetaWebhookPayload payload) {
         if (payload == null || payload.entry() == null) {
             return List.of();
         }
-
-        List<WhatsAppInboundMessage> messages = new ArrayList<>();
+        List<MetaWebhookPayload.Value> values = new ArrayList<>();
         for (MetaWebhookPayload.Entry entry : payload.entry()) {
             if (entry == null || entry.changes() == null) {
                 continue;
@@ -43,10 +81,21 @@ public class MetaWebhookPayloadParser {
                 if (change == null || change.value() == null) {
                     continue;
                 }
-                messages.addAll(parseValue(change.value()));
+                values.add(change.value());
             }
         }
-        return messages;
+        return values;
+    }
+
+    private MetaWebhookPayload.ErrorNode firstError(List<MetaWebhookPayload.ErrorNode> errors) {
+        if (errors == null) {
+            return null;
+        }
+        return errors.stream().filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private List<WhatsAppInboundMessage> parseValue(MetaWebhookPayload.Value value) {

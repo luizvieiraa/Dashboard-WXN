@@ -73,6 +73,17 @@ No serviço da aplicação, aba **Variables**, configure:
 > automaticamente por HTTPS em um domínio `*.up.railway.app`; não é
 > necessário configurar TLS manualmente.
 
+Ao ativar o WhatsApp real e o assistente virtual, cadastre também, como
+variáveis do serviço (nunca no repositório): `WHATSAPP_ENABLED`,
+`WHATSAPP_API_VERSION`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+`WHATSAPP_CONTACT_PHONE`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`,
+`WHATSAPP_APP_SECRET`, `AI_ENABLED`, `AI_API_KEY` e `AI_MODEL`. As demais
+(`AI_HISTORY_MESSAGES`, `AI_MAX_INPUT_CHARS`, `AI_MIN_CONFIDENCE`,
+`AI_KNOWLEDGE_BASE`, `CONVERSATION_MAX_UNRESOLVED_ATTEMPTS`) têm valores
+padrão seguros e só precisam ser definidas para ajustes. A descrição completa
+está no README, seções 13.6 e 14. A migration `V6` é aplicada
+automaticamente pelo Flyway no primeiro deploy desta versão.
+
 ### 5. Deploy
 
 O primeiro deploy acontece automaticamente após conectar o repositório. A
