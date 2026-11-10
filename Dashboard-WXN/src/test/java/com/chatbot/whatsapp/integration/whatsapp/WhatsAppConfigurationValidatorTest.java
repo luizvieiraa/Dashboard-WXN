@@ -18,6 +18,17 @@ class WhatsAppConfigurationValidatorTest {
     }
 
     @Test
+    void deveRecusarNumeroDeContatoQueNaoGeraLinkValido() {
+        WhatsAppProperties properties = new WhatsAppProperties(
+                true, "https://graph.facebook.com", "v21.0", "token", "123", "988887777",
+                "verify-token", "app-secret");
+
+        assertThatThrownBy(() -> new WhatsAppConfigurationValidator(properties).validate())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("WHATSAPP_CONTACT_PHONE");
+    }
+
+    @Test
     void deveFalharRapidoQuandoFaltaremCredenciais() {
         WhatsAppProperties properties = new WhatsAppProperties(
                 true, "https://graph.facebook.com", "v21.0", "", "123", "", "", "");

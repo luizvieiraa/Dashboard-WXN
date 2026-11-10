@@ -17,6 +17,12 @@ completo (clonar, subir o banco, rodar a aplicação).
 * Nomes em português são aceitáveis em comentários/documentação; nomes de
   classes, métodos e variáveis ficam em inglês, seguindo a convenção do
   ecossistema Java/Spring.
+* Telefones passam sempre por `util.PhoneNumbers` (normalização, link `wa.me`
+  e máscara para log). Logs nunca devem conter telefone completo, texto de
+  conversa ou a mensagem de exceções de banco: use `PhoneNumbers.mask` e
+  `LogSanitizer.describe`.
+* Textos do assistente virtual (prompt e base de conhecimento) ficam em
+  `src/main/resources/assistant/`, não no código.
 
 ## Rodando os testes
 
@@ -28,6 +34,13 @@ Os testes usam H2 em memória (perfil `test`, ver
 `src/test/resources/application-test.yml`) rodando as mesmas migrations
 Flyway do banco real, então não é necessário ter PostgreSQL instalado
 para rodar a suíte de testes localmente.
+
+A Cloud API da Meta e o provedor do assistente virtual nunca são chamados
+nos testes: os clientes HTTP são testados com `MockRestServiceServer`, e os
+fluxos completos substituem `WhatsAppClient` e `AiClient` por `@MockitoBean`
+(ver `AssistantAndHandoffIntegrationTest`). `BotAndAttendantConcurrencyTest`
+usa duas threads para provar que o bot não responde enquanto a conversa está
+sendo encaminhada para um atendente.
 
 ## Fluxo de branches (Git)
 

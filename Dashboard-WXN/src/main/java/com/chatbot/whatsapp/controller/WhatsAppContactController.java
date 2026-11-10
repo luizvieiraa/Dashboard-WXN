@@ -2,8 +2,10 @@ package com.chatbot.whatsapp.controller;
 
 import com.chatbot.whatsapp.dto.response.WhatsAppContactResponse;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppProperties;
+import com.chatbot.whatsapp.util.PhoneNumbers;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,13 +26,13 @@ public class WhatsAppContactController {
 
     @GetMapping("/contact")
     public WhatsAppContactResponse contact() {
-        String phone = properties.contactPhone();
-        if (!properties.enabled() || phone == null || !phone.matches("\\d{8,15}")) {
+        Optional<String> link = PhoneNumbers.whatsAppLink(properties.contactPhone());
+        if (!properties.enabled() || link.isEmpty()) {
             return new WhatsAppContactResponse(false, null);
         }
 
         String message = URLEncoder.encode(INITIAL_MESSAGE, StandardCharsets.UTF_8)
                 .replace("+", "%20");
-        return new WhatsAppContactResponse(true, "https://wa.me/" + phone + "?text=" + message);
+        return new WhatsAppContactResponse(true, link.get() + "?text=" + message);
     }
 }

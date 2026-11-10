@@ -1,6 +1,7 @@
 package com.chatbot.whatsapp.exception;
 
 import com.chatbot.whatsapp.dto.response.ErrorResponse;
+import com.chatbot.whatsapp.util.LogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.slf4j.Logger;
@@ -61,7 +62,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableMessage(
             HttpMessageNotReadableException ex,
             HttpServletRequest request) {
-        log.debug("Payload JSON invalido em {} {}", request.getMethod(), request.getRequestURI(), ex);
+        log.debug("Payload JSON invalido em {} {}: {}",
+                request.getMethod(), request.getRequestURI(), LogSanitizer.describe(ex));
         return build(HttpStatus.BAD_REQUEST, "JSON invalido ou incompatível com o formato esperado", request);
     }
 
@@ -95,7 +97,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
-        log.error("Erro nao tratado ao processar {} {}", request.getMethod(), request.getRequestURI(), ex);
+        // Sem a mensagem nem o stack trace completo: excecoes de banco e de
+        // clientes HTTP trazem valores da requisicao (telefone, texto da conversa).
+        log.error("Erro nao tratado ao processar {} {}: {}",
+                request.getMethod(), request.getRequestURI(), LogSanitizer.describe(ex));
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Ocorreu um erro interno inesperado", request);
     }
 

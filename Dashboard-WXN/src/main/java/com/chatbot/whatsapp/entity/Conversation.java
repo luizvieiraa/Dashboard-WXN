@@ -82,6 +82,15 @@ public class Conversation {
     @OneToOne(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private Attendance attendance;
 
+    /**
+     * Respostas automaticas seguidas sem solucao (intencao nao reconhecida ou
+     * pedido de mais informacoes). Ao atingir o limite configurado, a conversa
+     * e encaminhada para um atendente.
+     */
+    @Builder.Default
+    @Column(name = "unresolved_bot_attempts", nullable = false)
+    private int unresolvedBotAttempts = 0;
+
     public void assume(Attendant attendant) {
         requireStatus(ConversationStatus.WAITING_HUMAN);
         Instant now = Instant.now();
@@ -100,6 +109,24 @@ public class Conversation {
         if (status == ConversationStatus.CLOSED) throw invalidState();
         this.context = context;
         lastInteractionAt = Instant.now();
+    }
+
+    /** @return total de respostas automaticas seguidas sem solucao, ja contando esta. */
+    public int registerUnresolvedBotAttempt() {
+        if (!isAutomated()) throw invalidState();
+        return ++unresolvedBotAttempts;
+    }
+
+    /** Uma resposta automatica resolveu a mensagem: a contagem recomeca. */
+    public void resetUnresolvedBotAttempts() {
+        unresolvedBotAttempts = 0;
+    }
+
+    /** Conversa operada pelo bot (nao esta com humano nem encerrada). */
+    public boolean isAutomated() {
+        return status == ConversationStatus.BOT_ACTIVE
+                || status == ConversationStatus.COLLECTING_INFORMATION
+                || status == ConversationStatus.QUALIFIED;
     }
 
     public void changeAutomatedStatus(ConversationStatus next) {

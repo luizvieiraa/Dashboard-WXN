@@ -10,6 +10,11 @@ const state = {
     action: null
 };
 
+/* Link montado pelo backend a partir do telefone normalizado (somente dígitos). */
+const WHATSAPP_CONVERSATION_URL = /^https:\/\/wa\.me\/\d{8,15}$/;
+const INVALID_PHONE_MESSAGE = "Não foi possível abrir a conversa no WhatsApp: o telefone deste cliente "
+    + "está ausente ou é inválido. Confira o número antes de continuar o atendimento.";
+
 const elements = {
     filters: document.querySelector("#filters"),
     clearFilters: document.querySelector("#clear-filters"),
@@ -189,8 +194,10 @@ function actionContent(triage) {
     const wrapper = document.createElement("div");
     wrapper.className = "actions";
     if (triage.conversationStatus === "WAITING_HUMAN") {
+        wrapper.append(conversationButton(triage));
         wrapper.append(actionButton("Assumir", "claim", triage));
     } else if (triage.conversationStatus === "HUMAN_ACTIVE") {
+        wrapper.append(conversationButton(triage));
         wrapper.append(actionButton("Responder", "reply", triage));
         wrapper.append(actionButton("Encerrar", "close", triage, "button-danger"));
     } else {
@@ -210,6 +217,64 @@ function actionButton(label, action, triage, extraClass = "") {
     return button;
 }
 
+/* "Ir para a conversa": continua o atendimento direto no WhatsApp do cliente. */
+function conversationButton(triage) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-whatsapp";
+    button.textContent = "Ir para a conversa";
+    button.addEventListener("click", () => goToConversation(triage));
+    return button;
+}
+
+function isWhatsAppConversationUrl(url) {
+    return typeof url === "string" && WHATSAPP_CONVERSATION_URL.test(url);
+}
+
+function goToConversation(triage) {
+    if (!isWhatsAppConversationUrl(triage.customerWhatsAppUrl)) {
+        showToast(INVALID_PHONE_MESSAGE, true);
+        return;
+    }
+    if (triage.conversationStatus === "WAITING_HUMAN") {
+        // Antes de sair do dashboard, o atendente assume a conversa: o bot é
+        // pausado somente neste atendimento e não responde junto com ele.
+        openAction("claimAndOpen", triage);
+        return;
+    }
+    window.open(triage.customerWhatsAppUrl, "_blank", "noopener");
+}
+
+/*
+ * A aba é aberta no próprio clique de confirmação (antes da chamada à API) para
+ * não ser barrada pelo bloqueador de pop-ups; o endereço do WhatsApp só é
+ * carregado depois que o atendimento for assumido com sucesso.
+ */
+function prepareWhatsAppTab() {
+    const tab = window.open("", "_blank");
+    if (!tab) return null;
+    try {
+        tab.opener = null;
+        tab.document.title = "Abrindo o WhatsApp...";
+        tab.document.body.textContent = "Abrindo a conversa no WhatsApp...";
+    } catch (_) {
+        // Sem acesso ao conteúdo da aba: a navegação continua funcionando.
+    }
+    return tab;
+}
+
+function openPreparedWhatsAppTab(tab, url) {
+    if (!isWhatsAppConversationUrl(url)) {
+        if (tab) tab.close();
+        return false;
+    }
+    if (tab && !tab.closed) {
+        tab.location.replace(url);
+        return true;
+    }
+    return false;
+}
+
 function openAction(action, triage) {
     state.action = action;
     state.selectedTriage = triage;
@@ -227,6 +292,15 @@ function openAction(action, triage) {
         elements.dialogInput.placeholder = "Ex.: Carlos Lima";
         elements.dialogInput.maxLength = 255;
         elements.dialogSubmit.textContent = "Assumir atendimento";
+    } else if (action === "claimAndOpen") {
+        elements.dialogTitle.textContent = "Ir para a conversa";
+        elements.dialogContext.textContent += ". Ao confirmar, você assume o atendimento, as respostas "
+            + "automáticas são pausadas nesta conversa e o WhatsApp abre em uma nova aba.";
+        elements.dialogLabel.textContent = "Nome do atendente";
+        elements.dialogInput.type = "text";
+        elements.dialogInput.placeholder = "Ex.: Carlos Lima";
+        elements.dialogInput.maxLength = 255;
+        elements.dialogSubmit.textContent = "Assumir e abrir o WhatsApp";
     } else if (action === "reply") {
         elements.dialogTitle.textContent = "Responder cliente";
         elements.dialogLabel.textContent = "Mensagem";
@@ -262,6 +336,11 @@ async function submitAction(event) {
             body: {attendant: value},
             success: "Atendimento assumido com sucesso."
         },
+        claimAndOpen: {
+            url: `/api/v1/conversations/${triage.conversationId}/human/claim`,
+            body: {attendant: value},
+            success: "Atendimento assumido. Continue a conversa na aba do WhatsApp."
+        },
         reply: {
             url: `/api/v1/conversations/${triage.conversationId}/human/reply`,
             body: {message: value},
@@ -274,6 +353,8 @@ async function submitAction(event) {
         }
     };
     const current = actions[state.action];
+    const opensWhatsApp = state.action === "claimAndOpen";
+    const whatsappTab = opensWhatsApp ? prepareWhatsAppTab() : null;
 
     elements.dialogSubmit.disabled = true;
     elements.dialogError.hidden = true;
@@ -283,9 +364,15 @@ async function submitAction(event) {
             body: current.body ? JSON.stringify(current.body) : undefined
         });
         elements.dialog.close();
-        showToast(current.success);
+        if (opensWhatsApp && !openPreparedWhatsAppTab(whatsappTab, triage.customerWhatsAppUrl)) {
+            showToast("Atendimento assumido. O navegador bloqueou a nova aba: "
+                + "clique em “Ir para a conversa” para abrir o WhatsApp.");
+        } else {
+            showToast(current.success);
+        }
         await loadDashboard();
     } catch (error) {
+        if (whatsappTab && !whatsappTab.closed) whatsappTab.close();
         elements.dialogError.textContent = error.message;
         elements.dialogError.hidden = false;
     } finally {
@@ -331,10 +418,13 @@ function showFeedback(message, error = false) {
     elements.feedback.classList.toggle("error", error);
 }
 
-function showToast(message) {
+function showToast(message, error = false) {
     elements.toast.textContent = message;
+    elements.toast.classList.toggle("toast-error", error);
+    elements.toast.setAttribute("role", error ? "alert" : "status");
     elements.toast.hidden = false;
-    window.setTimeout(() => { elements.toast.hidden = true; }, 3200);
+    window.clearTimeout(showToast.timeout);
+    showToast.timeout = window.setTimeout(() => { elements.toast.hidden = true; }, error ? 6500 : 3200);
 }
 
 function formatNumber(value) {

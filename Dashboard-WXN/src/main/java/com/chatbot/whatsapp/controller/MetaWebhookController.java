@@ -5,8 +5,11 @@ import com.chatbot.whatsapp.integration.whatsapp.MetaWebhookPayloadParser;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppInboundMessage;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppProperties;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppSignatureVerifier;
+import com.chatbot.whatsapp.integration.whatsapp.WhatsAppStatusUpdate;
 import com.chatbot.whatsapp.service.WhatsAppInboundService;
 import com.chatbot.whatsapp.service.WhatsAppInboundBatchResult;
+import com.chatbot.whatsapp.service.WhatsAppStatusService;
+import com.chatbot.whatsapp.util.LogSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -56,17 +59,20 @@ public class MetaWebhookController {
     private final WhatsAppSignatureVerifier signatureVerifier;
     private final MetaWebhookPayloadParser payloadParser;
     private final WhatsAppInboundService whatsAppInboundService;
+    private final WhatsAppStatusService whatsAppStatusService;
     private final ObjectMapper objectMapper;
 
     public MetaWebhookController(WhatsAppProperties properties,
                                  WhatsAppSignatureVerifier signatureVerifier,
                                  MetaWebhookPayloadParser payloadParser,
                                  WhatsAppInboundService whatsAppInboundService,
+                                 WhatsAppStatusService whatsAppStatusService,
                                  ObjectMapper objectMapper) {
         this.properties = properties;
         this.signatureVerifier = signatureVerifier;
         this.payloadParser = payloadParser;
         this.whatsAppInboundService = whatsAppInboundService;
+        this.whatsAppStatusService = whatsAppStatusService;
         this.objectMapper = objectMapper;
     }
 
@@ -115,6 +121,10 @@ public class MetaWebhookController {
      * de usuario. Se alguma mensagem falhar internamente, responde {@code 500}
      * para que a Meta tente entrega-la novamente; as mensagens ja persistidas
      * sao descartadas pela chave de idempotencia.</p>
+     *
+     * <p>Notificacoes de status ({@code sent}, {@code delivered}, {@code read},
+     * {@code failed}) atualizam o status da mensagem enviada correspondente. A
+     * aplicacao e idempotente, entao uma reentrega nao causa efeito duplicado.</p>
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Recebe notificacoes de mensagens da Meta",
@@ -131,29 +141,50 @@ public class MetaWebhookController {
         }
 
         List<WhatsAppInboundMessage> messages;
+        List<WhatsAppStatusUpdate> statuses;
         try {
             MetaWebhookPayload payload = objectMapper.readValue(rawBody, MetaWebhookPayload.class);
             messages = payloadParser.parse(payload);
+            statuses = payloadParser.parseStatuses(payload);
         } catch (Exception ex) {
             // Responder 200 evita um loop de reentrega de um payload que nunca
-            // vamos conseguir interpretar. O corpo fica registrado em log.
-            log.error("Nao foi possivel interpretar a notificacao do webhook: {}", ex.getMessage());
+            // vamos conseguir interpretar. O conteudo nao e registrado em log.
+            log.error("Nao foi possivel interpretar a notificacao do webhook: {}", LogSanitizer.describe(ex));
             return ResponseEntity.ok().build();
         }
 
+        boolean statusFailure = applyStatuses(statuses);
+
         if (messages.isEmpty()) {
             log.debug("Notificacao recebida sem mensagens de usuario (provavelmente status de entrega)");
-            return ResponseEntity.ok().build();
+            return statusFailure
+                    ? ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+                    : ResponseEntity.ok().build();
         }
 
         WhatsAppInboundBatchResult result = whatsAppInboundService.handleAll(messages);
         log.info("Notificacao do webhook: {} recebida(s), {} processada(s), {} ignorada(s), {} falha(s)",
                 messages.size(), result.processed(), result.ignored(), result.failed());
-        if (result.hasFailures()) {
+        if (result.hasFailures() || statusFailure) {
             // Solicita reentrega. As mensagens que ja foram confirmadas ficam
             // protegidas pelo external_id e nao serao respondidas novamente.
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
         return ResponseEntity.ok().build();
+    }
+
+    /** @return {@code true} quando a gravacao dos status falhou e a notificacao deve ser reentregue. */
+    private boolean applyStatuses(List<WhatsAppStatusUpdate> statuses) {
+        if (statuses.isEmpty()) {
+            return false;
+        }
+        try {
+            int applied = whatsAppStatusService.apply(statuses);
+            log.debug("Status de entrega: {} recebido(s), {} aplicado(s)", statuses.size(), applied);
+            return false;
+        } catch (RuntimeException ex) {
+            log.error("Falha ao registrar status de entrega do WhatsApp: {}", LogSanitizer.describe(ex));
+            return true;
+        }
     }
 }

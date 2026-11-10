@@ -31,12 +31,18 @@ ai:
   model: ""
   timeout-seconds: 1
   max-output-tokens: 100
+  history-messages: 10
+  max-input-chars: 1000
+  min-confidence: 0.6
+  knowledge-base: "classpath:assistant/knowledge-base.md"
 
 conversation:
   lifecycle:
     enabled: false
     inactivity-hours: 24
     check-interval-ms: 300000
+  handoff:
+    max-unresolved-attempts: 3
 
 logging:
   level:

@@ -3,6 +3,8 @@ package com.chatbot.whatsapp.service;
 import com.chatbot.whatsapp.dto.request.WhatsAppWebhookRequest;
 import com.chatbot.whatsapp.dto.response.WhatsAppWebhookResponse;
 import com.chatbot.whatsapp.integration.whatsapp.WhatsAppInboundMessage;
+import com.chatbot.whatsapp.util.LogSanitizer;
+import com.chatbot.whatsapp.util.PhoneNumbers;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,8 +61,11 @@ public class WhatsAppInboundService {
                 }
             } catch (RuntimeException ex) {
                 failed++;
+                // Sem a mensagem da excecao: erros de banco trazem os valores
+                // gravados (telefone, texto) e nao podem ir para o log.
                 log.error("Falha ao processar a mensagem {} de {}: {}",
-                        message.messageId(), message.phone(), ex.getMessage(), ex);
+                        LogSanitizer.messageRef(message.messageId()), PhoneNumbers.mask(message.phone()),
+                        LogSanitizer.describe(ex));
             }
         }
         return new WhatsAppInboundBatchResult(processed, ignored, failed);
@@ -69,19 +74,20 @@ public class WhatsAppInboundService {
     private boolean handle(WhatsAppInboundMessage message) {
         if (!isValidPhone(message.phone())) {
             log.warn("Mensagem {} ignorada: telefone '{}' fora do formato esperado",
-                    message.messageId(), message.phone());
+                    LogSanitizer.messageRef(message.messageId()), PhoneNumbers.mask(message.phone()));
             return false;
         }
 
         if (messageService.alreadyProcessed(message.messageId())) {
             log.info("Mensagem {} ja processada anteriormente; reentrega descartada",
-                    message.messageId());
+                    LogSanitizer.messageRef(message.messageId()));
             return false;
         }
 
         if (!message.isText()) {
             log.info("Mensagem {} de {} e do tipo '{}' e nao sera interpretada pelo chatbot",
-                    message.messageId(), message.phone(), message.type());
+                    LogSanitizer.messageRef(message.messageId()), PhoneNumbers.mask(message.phone()),
+                    message.type());
             messageProcessingService.processUnsupported(
                     message.phone(), message.messageId(), message.type());
             return true;
@@ -97,14 +103,21 @@ public class WhatsAppInboundService {
             WhatsAppWebhookResponse response =
                     messageProcessingService.process(request, message.messageId());
             log.info("Mensagem {} processada na conversa {}",
-                    message.messageId(), response.conversationId());
+                    LogSanitizer.messageRef(message.messageId()), response.conversationId());
             return true;
         } catch (DataIntegrityViolationException ex) {
-            // Duas entregas simultaneas da mesma mensagem: o indice unico de
-            // external_id garante que apenas uma seja gravada.
-            log.info("Mensagem {} processada em paralelo por outra entrega; ignorando",
-                    message.messageId());
-            return false;
+            if (messageService.alreadyProcessed(message.messageId())) {
+                // Duas entregas simultaneas da mesma mensagem: o indice unico de
+                // external_id garante que apenas uma seja gravada.
+                log.info("Mensagem {} processada em paralelo por outra entrega; ignorando",
+                        LogSanitizer.messageRef(message.messageId()));
+                return false;
+            }
+            // Outra restricao violada (ex.: primeira mensagem de um cliente novo
+            // chegando em duas notificacoes simultaneas). A falha e propagada
+            // para o webhook responder 500 e a Meta reentregar a mensagem, em
+            // vez de descarta-la em silencio.
+            throw ex;
         }
     }
 

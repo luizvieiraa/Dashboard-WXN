@@ -39,6 +39,21 @@ class ConversationDomainTest {
     }
 
     @Test
+    void countsUnresolvedBotAttemptsOnlyWhileTheBotOwnsTheConversation() {
+        Conversation conversation = Conversation.builder().status(ConversationStatus.QUALIFIED).build();
+        assertThat(conversation.getUnresolvedBotAttempts()).isZero();
+        assertThat(conversation.registerUnresolvedBotAttempt()).isEqualTo(1);
+        assertThat(conversation.registerUnresolvedBotAttempt()).isEqualTo(2);
+        conversation.resetUnresolvedBotAttempts();
+        assertThat(conversation.getUnresolvedBotAttempts()).isZero();
+
+        conversation.changeAutomatedStatus(ConversationStatus.WAITING_HUMAN);
+        assertThat(conversation.isAutomated()).isFalse();
+        assertThatThrownBy(conversation::registerUnresolvedBotAttempt)
+                .isInstanceOf(InvalidConversationStateException.class);
+    }
+
+    @Test
     void attendantRequiresNonBlankName() {
         assertThatThrownBy(() -> new Attendant(" ")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Attendant(null)).isInstanceOf(IllegalArgumentException.class);
