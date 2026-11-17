@@ -21,7 +21,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Cliente HTTP para APIs compatíveis com o formato Responses da OpenAI.
+ * Cliente HTTP para APIs compativeis com Responses ou Chat Completions (Gemini).
  * Falhas externas nunca interrompem o atendimento: o chamador usa fallback.
  */
 @Component
@@ -96,6 +96,10 @@ public class OpenAiResponsesClient implements AiClient {
         }
 
         try {
+            if (usesChatCompletions()) {
+                return chatCompletion(INSTRUCTIONS,
+                        "Contexto do cliente: " + customerContext + "\nMensagem: " + customerMessage, false);
+            }
             AiApiResponse response = restClient.post()
                     .uri(properties.apiUrl())
                     .headers(headers -> headers.setBearerAuth(properties.apiKey()))
@@ -135,6 +139,10 @@ public class OpenAiResponsesClient implements AiClient {
         }
 
         try {
+            if (usesChatCompletions()) {
+                return chatCompletion(resources.instructions(), userInput(request), true)
+                        .flatMap(this::parseDecision);
+            }
             AiApiResponse response = restClient.post()
                     .uri(properties.apiUrl())
                     .headers(headers -> headers.setBearerAuth(properties.apiKey()))
@@ -154,6 +162,42 @@ public class OpenAiResponsesClient implements AiClient {
             log.warn("Provedor de IA indisponivel; usando o fluxo de triagem local ({})", LogSanitizer.describe(ex));
             return Optional.empty();
         }
+    }
+
+    private boolean usesChatCompletions() {
+        return properties.apiUrl().replaceAll("/+$", "").endsWith("/chat/completions");
+    }
+
+    private Optional<String> chatCompletion(String instructions, String input, boolean structured) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", properties.model());
+        body.put("messages", List.of(
+                Map.of("role", "system", "content", instructions),
+                Map.of("role", "user", "content", input)));
+        body.put("max_tokens", maxOutputTokens());
+        if (structured) {
+            body.put("response_format", Map.of("type", "json_schema", "json_schema", Map.of(
+                    "name", DECISION_FORMAT.get("name"),
+                    "strict", true,
+                    "schema", DECISION_FORMAT.get("schema"))));
+        }
+        JsonNode response = restClient.post()
+                .uri(properties.apiUrl())
+                .headers(headers -> headers.setBearerAuth(properties.apiKey()))
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        if (response == null) {
+            return Optional.empty();
+        }
+        JsonNode choice = response.path("choices").path(0);
+        // Nunca aproveita JSON parcial, recusas ou respostas bloqueadas pelo provedor.
+        if (!"stop".equals(choice.path("finish_reason").asText())) {
+            return Optional.empty();
+        }
+        JsonNode content = choice.path("message").path("content");
+        return content.isTextual() && !content.asText().isBlank()
+                ? Optional.of(content.asText().strip()) : Optional.empty();
     }
 
     /**

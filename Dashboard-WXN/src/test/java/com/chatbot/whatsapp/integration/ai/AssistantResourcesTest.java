@@ -15,14 +15,15 @@ class AssistantResourcesTest {
     }
 
     @Test
-    void deveCarregarPromptEmpacotadoEBaseVaziaPorPadrao() {
+    void deveCarregarPromptEBaseOficialEmpacotados() {
         AssistantResources resources = AssistantResources.fromClasspath(withKnowledgeBase(null));
 
         assertThat(resources.systemPrompt())
                 .contains("assistente virtual da WXN", "Nunca invente preços", "<dados_do_atendimento>");
-        // A base padrao so tem comentarios de manutencao, que nao sao enviados.
-        assertThat(resources.knowledgeBase()).isEmpty();
-        assertThat(resources.instructions()).contains("(nenhuma informação cadastrada)");
+        assertThat(resources.knowledgeBase())
+                .contains("vende chatbots", "24 horas por dia", "atendimento humano")
+                .doesNotContain("<!--", "Regras de manutenção:");
+        assertThat(resources.instructions()).contains("# WXN — informações oficiais");
     }
 
     @Test

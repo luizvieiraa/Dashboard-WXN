@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
  * Configuracao da geracao opcional de respostas por IA.
  *
  * @param enabled         liga o assistente virtual; desligado, o chatbot usa somente o fluxo local.
- * @param apiUrl          endpoint compativel com o formato OpenAI Responses.
+ * @param apiUrl          endpoint Responses ou Chat Completions (incluindo Gemini).
  * @param apiKey          chave do provedor, mantida somente no ambiente.
  * @param model           modelo configurado no provedor.
  * @param timeoutSeconds  limite de espera pela resposta antes do fallback.

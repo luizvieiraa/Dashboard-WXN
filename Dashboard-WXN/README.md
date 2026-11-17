@@ -594,7 +594,7 @@ Todas documentadas em [`.env.example`](.env.example). Resumo:
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | para cadastrar o webhook | String secreta usada no handshake de verificação |
 | `WHATSAPP_APP_SECRET` | sim, em produção | App Secret; valida a assinatura `X-Hub-Signature-256` das notificações |
 | `AI_ENABLED` | não (padrão false) | Habilita o assistente virtual: classificação da primeira mensagem e respostas depois da triagem (seção 14.1) |
-| `AI_API_URL` | quando IA ativa | Endpoint compatível com o formato OpenAI Responses |
+| `AI_API_URL` | quando IA ativa | Endpoint OpenAI Responses ou Chat Completions (incluindo Gemini) |
 | `AI_API_KEY` | quando IA ativa | Chave do provedor, mantida somente no ambiente |
 | `AI_MODEL` | quando IA ativa | Modelo configurado no provedor |
 | `AI_TIMEOUT_SECONDS` | não (padrão 10) | Limite de espera pela IA antes do fallback |
@@ -613,20 +613,49 @@ Todas documentadas em [`.env.example`](.env.example). Resumo:
 O assistente virtual é opcional: com `AI_ENABLED=false` (padrão) ou se o
 provedor falhar, o chatbot continua com o fluxo local (palavras-chave e
 respostas prontas), sem perda de funcionalidade. O provedor é qualquer API
-compatível com o formato OpenAI Responses (`AI_API_URL`, `AI_API_KEY`,
-`AI_MODEL`). O uso tem custo por chamada no provedor escolhido.
+compatível com OpenAI Responses ou Chat Completions (`AI_API_URL`, `AI_API_KEY`,
+`AI_MODEL`). O custo e as cotas dependem do provedor e do plano da conta.
+
+**Gemini no simulador local:** crie uma chave no [Google AI Studio](https://aistudio.google.com/apikey)
+e salve somente no `.env`:
+
+```dotenv
+WHATSAPP_ENABLED=false
+AI_ENABLED=true
+AI_API_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+AI_API_KEY=sua-chave-do-gemini
+AI_MODEL=gemini-3.5-flash-lite
+AI_TIMEOUT_SECONDS=20
+AI_MAX_OUTPUT_TOKENS=400
+AI_HISTORY_MESSAGES=6
+```
+
+Use um projeto na camada gratuita, sem ativar faturamento, se nao houver orcamento.
+As cotas e a disponibilidade variam por conta; confira no AI Studio. Se houver erro,
+inclusive cota esgotada (HTTP 429), o chatbot usa o fluxo local, sem trocar de
+provedor ou modelo automaticamente. Limitar tokens nao impede cobrancas em uma
+conta que tenha faturamento ativo. Na camada gratuita, o Google pode usar o conteudo
+para melhorar seus produtos: comece com dados ficticios, conforme as
+[condicoes do Gemini](https://aistudio.google.com/docs/pricing).
+
+Depois de salvar, execute `docker compose up -d --build app` e abra
+`http://localhost:8080/simulator`. O endpoint que termina em `/chat/completions`
+seleciona esse formato de requisicao; os demais continuam usando Responses.
 
 **Quando ele é consultado:**
 
 1. Reclamações e pedidos explícitos de atendente são detectados antes, sem
    chamada externa, e vão direto para a fila humana.
-2. Na **primeira mensagem** da conversa, o assistente só decide se ela deve ir
-   direto para um atendente (reclamação, pedido de pessoa ou assunto sensível,
-   com confiança mínima). Caso contrário, começa a triagem de nome, empresa e
-   assunto, que é sempre determinística.
-3. Depois da triagem, cada mensagem recebe uma decisão estruturada (JSON
+2. Com a IA configurada, a conversa e livre desde a **primeira mensagem**:
+   responde sobre a WXN sem exigir nome, empresa ou assunto. Dados sao pedidos
+   apenas quando necessarios, respeitando quem prefere nao se identificar.
+   Conversas que estavam na coleta guiada tambem passam para o fluxo livre;
+   conversas ja encaminhadas para humanos permanecem pausadas.
+3. Cada mensagem recebe uma decisão estruturada (JSON
    Schema): intenção, ação (`RESOLVE`, `ASK_MORE` ou `HANDOFF`), confiança e
    resposta.
+   Sem IA configurada, permanece a coleta guiada local. Se a IA configurada
+   falhar, usa respostas locais por palavras-chave sem tratar o texto como cadastro.
 
 **Regras que valem em código, independentemente do prompt:**
 
@@ -651,9 +680,9 @@ como não confiáveis (proteção contra prompt injection).
 
 * `src/main/resources/assistant/system-prompt.txt`: regras do assistente.
 * `src/main/resources/assistant/knowledge-base.md`: informações oficiais da
-  empresa. **Vem vazia de propósito**: enquanto não for preenchida, o
-  assistente apenas acolhe, faz a triagem, pede detalhes e encaminha; ele
-  nunca informa preços, prazos ou políticas. Para manter o arquivo fora da
+  WXN: venda de chatbots de IA, atendimento automático 24 horas e encaminhamento
+  humano quando necessário. Preços, prazos, políticas e disponibilidade humana
+  ainda dependem de confirmação; o assistente não deve inventá-los. Para manter o arquivo fora da
   imagem, use `AI_KNOWLEDGE_BASE=file:/caminho/base.md`.
 
 Para ativar: preencha `AI_ENABLED=true`, `AI_API_KEY` e `AI_MODEL` (e

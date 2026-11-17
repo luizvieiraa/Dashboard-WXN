@@ -40,7 +40,7 @@ whatsapp:
   webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
   app-secret: ${WHATSAPP_APP_SECRET:}
 
-# Geracao opcional de respostas com uma API compativel com OpenAI Responses.
+# Geracao opcional com OpenAI Responses ou Chat Completions (Gemini).
 # Desabilitada por padrao; as respostas locais continuam sendo o fallback.
 ai:
   enabled: ${AI_ENABLED:false}

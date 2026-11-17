@@ -4,7 +4,7 @@ package com.chatbot.whatsapp.service.chatbot;
 public enum AssistantStage {
     /** Primeira mensagem da conversa: so interessa saber se ela deve ir direto para um atendente. */
     FIRST_MESSAGE("PRIMEIRA_MENSAGEM"),
-    /** Triagem concluida: o assistente responde, pede detalhes ou encaminha. */
+    /** Conversa livre, inclusive antes de coletar dados: responde, pede detalhes ou encaminha. */
     CONVERSATION("CONVERSA");
 
     private final String label;

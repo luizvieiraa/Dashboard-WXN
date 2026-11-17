@@ -62,8 +62,12 @@ public class IntelligentResponseService {
                 ));
     }
 
+    public boolean isAvailable() {
+        return aiClient.isAvailable();
+    }
+
     /**
-     * Decide a resposta para uma mensagem livre, depois da coleta estruturada.
+     * Decide a resposta desde a primeira mensagem, sem exigir coleta estruturada.
      *
      * @param fallbackIntent intencao do classificador local, usada quando o
      *                       assistente virtual nao responde.

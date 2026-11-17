@@ -42,8 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <ol>
  *   <li>reclamacao detectada por palavras-chave: fila humana com prioridade alta;</li>
  *   <li>pedido explicito de atendente: fila humana;</li>
- *   <li>primeira mensagem: o assistente virtual (se ligado) pode encaminhar direto;</li>
- *   <li>coleta guiada de nome, empresa e assunto (deterministica);</li>
+ *   <li>assistente virtual disponivel: conversa livre desde a primeira mensagem;</li>
+ *   <li>sem assistente configurado: coleta guiada de nome, empresa e assunto;</li>
  *   <li>mensagens livres: o assistente virtual responde, pede detalhes ou encaminha;
  *       sem ele, vale o classificador local. Respostas seguidas sem solucao levam a
  *       um atendente.</li>
@@ -174,22 +174,16 @@ public class MessageProcessingService {
             return handoff(conversation, message, HandoffReason.CUSTOMER_REQUEST);
         }
 
-        if (!informationCollectionService.hasStarted(conversation)) {
-            Optional<HandoffReason> firstMessageHandoff = intelligentResponseService.handoffOnFirstMessage(
-                    conversation, customer, message, inbound.getId());
-            if (firstMessageHandoff.isPresent()) {
-                return handoff(conversation, message, firstMessageHandoff.get());
+        if (!intelligentResponseService.isAvailable()) {
+            Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
+                    conversation, customer, message);
+            if (collectionResult.isPresent()) {
+                TriageCollectionResult result = collectionResult.get();
+                return new BotTurn(result.reply(), result.context());
             }
-        }
-
-        Optional<TriageCollectionResult> collectionResult = informationCollectionService.collect(
-                conversation,
-                customer,
-                message
-        );
-        if (collectionResult.isPresent()) {
-            TriageCollectionResult result = collectionResult.get();
-            return new BotTurn(result.reply(), result.context());
+        } else if (conversation.getStatus() == ConversationStatus.COLLECTING_INFORMATION) {
+            // Conversas iniciadas no fluxo antigo tambem passam a ser livres.
+            conversationService.changeStatus(conversation, ConversationStatus.BOT_ACTIVE);
         }
 
         ChatIntent intent = intentClassifier.classify(message);
