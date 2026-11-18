@@ -1,8 +1,11 @@
 const API = {
     webhook: "/api/v1/webhook/whatsapp",
     conversation: id => `/api/v1/conversations/${id}`,
-    whatsappContact: "/api/v1/whatsapp/contact"
+    whatsappContact: "/api/v1/whatsapp/contact",
+    integrations: "/api/v1/health/integrations"
 };
+
+const HUMAN_CONTEXTS = ["HUMAN_HANDOFF", "COMPLAINT_ESCALATED", "HUMAN_QUEUE_MESSAGE", "HUMAN_REPLY"];
 
 const statusLabels = {
     BOT_ACTIVE: "Bot ativo",
@@ -40,6 +43,10 @@ const elements = {
     statusBadge: document.querySelector("#status-badge"),
     statusLabel: document.querySelector("#status-label"),
     lastActivity: document.querySelector("#last-activity"),
+    replySource: document.querySelector("#reply-source"),
+    aiStatus: document.querySelector("#ai-status"),
+    whatsappStatus: document.querySelector("#whatsapp-status"),
+    integrationDetail: document.querySelector("#integration-detail"),
     handoffNote: document.querySelector("#handoff-note"),
     newSession: document.querySelector("#new-session"),
     whatsappButton: document.querySelector("#whatsapp-button"),
@@ -62,6 +69,7 @@ function startNewSession() {
     elements.emptyState.hidden = false;
     elements.conversationId.textContent = "Nova conversa";
     elements.lastActivity.textContent = "—";
+    elements.replySource.textContent = "—";
     elements.handoffNote.hidden = true;
     elements.input.disabled = false;
     elements.sendButton.disabled = false;
@@ -99,6 +107,7 @@ async function sendMessage(event) {
         state.conversationId = result.conversationId;
         sessionStorage.setItem("wxn.simulator.conversationId", String(result.conversationId));
         await loadConversation(result.conversationId);
+        loadIntegrations();
     } catch (error) {
         if (!state.conversationId) elements.phone.disabled = false;
         showToast(error.message);
@@ -115,8 +124,67 @@ async function loadConversation(id) {
     elements.phone.disabled = true;
     elements.conversationId.textContent = `Conversa #${conversation.id}`;
     elements.lastActivity.textContent = formatDateTime(conversation.lastInteractionAt);
+    elements.replySource.textContent = replySourceLabel(conversation);
     renderMessages(conversation.messages || []);
     updateStatus(conversation.status);
+}
+
+/** De onde veio a resposta mais recente, a partir do contexto gravado na conversa. */
+function replySourceLabel(conversation) {
+    const context = conversation.context;
+    if (!context || conversation.status === "CLOSED") return "—";
+    if (context.startsWith("AI_")) return "Assistente virtual (IA)";
+    if (HUMAN_CONTEXTS.includes(context)) return "Equipe humana";
+    return "Fluxo local";
+}
+
+async function loadIntegrations() {
+    try {
+        const status = await request(API.integrations);
+        const assistant = describeAssistant(status.assistant);
+        const whatsapp = describeWhatsApp(status.whatsapp);
+        renderIntegration(elements.aiStatus, assistant);
+        renderIntegration(elements.whatsappStatus, whatsapp);
+        const details = [assistant.detail, whatsapp.detail].filter(Boolean);
+        elements.integrationDetail.textContent = details.join(" · ");
+        elements.integrationDetail.hidden = details.length === 0;
+    } catch (_) {
+        renderIntegration(elements.aiStatus, {text: "Indisponível", tone: "muted"});
+        renderIntegration(elements.whatsappStatus, {text: "Indisponível", tone: "muted"});
+    }
+}
+
+function describeAssistant(ai) {
+    if (!ai.enabled) return {text: "Desligado · respostas locais", tone: "muted"};
+    if (!ai.configured) {
+        return {text: "Configuração incompleta", tone: "error",
+            detail: "IA: preencha AI_API_URL, AI_API_KEY e AI_MODEL."};
+    }
+    const name = [providerName(ai.host), ai.model].filter(Boolean).join(" · ");
+    if (ai.failing) return {text: `${name} · falhando`, tone: "error", detail: `IA: ${ai.lastFailure}`};
+    if (ai.lastSuccessAt) return {text: `${name} · respondendo`, tone: "ok"};
+    return {text: `${name} · sem chamadas ainda`, tone: "muted"};
+}
+
+function describeWhatsApp(whatsapp) {
+    if (whatsapp.mode !== "META_CLOUD_API") return {text: "Simulado · sem envio real", tone: "muted"};
+    if (whatsapp.failing) {
+        return {text: "Meta · falha no último envio", tone: "error", detail: `WhatsApp: ${whatsapp.lastFailure}`};
+    }
+    if (whatsapp.lastSuccessAt) return {text: "Meta · último envio confirmado", tone: "ok"};
+    return {text: "Meta · aguardando mensagens", tone: "muted"};
+}
+
+function providerName(host) {
+    if (!host) return "";
+    if (host.includes("googleapis.com")) return "Gemini";
+    if (host.includes("openai.com")) return "OpenAI";
+    return host;
+}
+
+function renderIntegration(element, {text, tone}) {
+    element.textContent = text;
+    element.className = `tone-${tone}`;
 }
 
 function renderMessages(messages) {
@@ -264,3 +332,4 @@ if (state.conversationId) {
     startNewSession();
 }
 loadWhatsAppContact();
+loadIntegrations();

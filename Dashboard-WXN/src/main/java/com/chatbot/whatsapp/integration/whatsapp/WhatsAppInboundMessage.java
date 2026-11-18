@@ -29,9 +29,15 @@ public record WhatsAppInboundMessage(
 ) {
 
     public static final String TYPE_TEXT = "text";
+    public static final String TYPE_REACTION = "reaction";
 
     /** Somente mensagens de texto tem conteudo que o chatbot sabe interpretar. */
     public boolean isText() {
         return TYPE_TEXT.equals(type) && text != null && !text.isBlank();
+    }
+
+    /** Emoji de reacao a uma mensagem ja enviada: nao e um pedido do cliente. */
+    public boolean isReaction() {
+        return TYPE_REACTION.equals(type);
     }
 }

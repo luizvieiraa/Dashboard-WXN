@@ -25,6 +25,12 @@ public class MetaWebhookPayloadParser {
 
     private static final Logger log = LoggerFactory.getLogger(MetaWebhookPayloadParser.class);
 
+    private final WhatsAppProperties properties;
+
+    public MetaWebhookPayloadParser(WhatsAppProperties properties) {
+        this.properties = properties;
+    }
+
     /**
      * Extrai as mensagens enviadas por usuarios, em ordem de chegada.
      *
@@ -103,6 +109,9 @@ public class MetaWebhookPayloadParser {
             // Notificacoes de status (sent/delivered/read) chegam sem "messages".
             return List.of();
         }
+        if (isForAnotherBusinessNumber(value.metadata())) {
+            return List.of();
+        }
 
         Map<String, String> namesByWaId = contactNames(value.contacts());
 
@@ -126,6 +135,22 @@ public class MetaWebhookPayloadParser {
             ));
         }
         return messages;
+    }
+
+    /**
+     * Todos os numeros das contas assinadas pelo app chegam na mesma URL. A
+     * resposta sai sempre de WHATSAPP_PHONE_NUMBER_ID, entao uma mensagem
+     * enviada a outro numero seria respondida pelo remetente errado.
+     */
+    private boolean isForAnotherBusinessNumber(MetaWebhookPayload.Metadata metadata) {
+        String configured = properties.phoneNumberId();
+        String received = metadata == null ? null : metadata.phone_number_id();
+        if (isBlank(configured) || isBlank(received) || configured.trim().equals(received.trim())) {
+            return false;
+        }
+        log.warn("Mensagem para outro numero comercial ignorada: phone_number_id {} recebido, {} configurado "
+                + "em WHATSAPP_PHONE_NUMBER_ID (confira em WhatsApp > API Setup)", received.trim(), configured.trim());
+        return true;
     }
 
     private Map<String, String> contactNames(List<MetaWebhookPayload.Contact> contacts) {

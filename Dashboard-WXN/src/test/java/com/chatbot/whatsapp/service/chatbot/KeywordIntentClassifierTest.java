@@ -17,6 +17,8 @@ class KeywordIntentClassifierTest {
             "Qual o preço do produto X?|PRICE_INQUIRY",
             "Quanto custa o plano premium|PRICE_INQUIRY",
             "Olá, gostaria de saber o preço|PRICE_INQUIRY",
+            "Olá, quero saber os valores.|PRICE_INQUIRY",
+            "Quais são os preços?|PRICE_INQUIRY",
             "ajuda|HELP",
             "menu|HELP",
             "dois produtos|UNKNOWN",

@@ -66,6 +66,29 @@ class MetaWhatsAppClientTest {
         server.verify();
         assertThat(result.sent()).isTrue();
         assertThat(result.providerMessageId()).isEqualTo("wamid.ENVIADA");
+        assertThat(client.status().failing()).isFalse();
+        assertThat(client.status().lastSuccessAt()).isNotNull();
+    }
+
+    @Test
+    void deveRegistrarOMotivoDaUltimaFalhaDeEnvio() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        MetaWhatsAppClient client = new MetaWhatsAppClient(
+                properties("token-secreto", "1234567890"), builder.build(), NO_WAIT);
+
+        server.expect(requestTo("https://graph.example.test/v21.0/1234567890/messages"))
+                .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON).body("""
+                        {"error": {"code": 131030, "message": "Recipient phone number not in allowed list"}}
+                        """));
+
+        client.sendMessage("5511988887777", "texto");
+
+        server.verify();
+        assertThat(client.status().failing()).isTrue();
+        assertThat(client.status().lastFailure())
+                .isEqualTo("HTTP 400, codigo 131030: Recipient phone number not in allowed list")
+                .doesNotContain("token-secreto");
     }
 
     @Test

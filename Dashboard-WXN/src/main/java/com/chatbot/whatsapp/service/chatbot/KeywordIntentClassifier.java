@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
 public class KeywordIntentClassifier implements IntentClassifier {
 
     private static final List<String> GREETING_KEYWORDS = List.of("oi", "ola", "bom dia", "boa tarde", "boa noite", "eae");
-    private static final List<String> PRICE_KEYWORDS = List.of("preco", "valor", "quanto custa", "orcamento");
+    private static final List<String> PRICE_KEYWORDS = List.of(
+            "preco", "precos", "valor", "valores", "quanto custa", "orcamento", "orcamentos");
     private static final List<String> HELP_KEYWORDS = List.of("ajuda", "help", "menu", "comandos");
 
     @Override

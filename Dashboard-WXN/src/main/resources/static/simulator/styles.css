@@ -726,6 +726,24 @@ main {
 .session-details dt { color: #91a5c0; font-size: 0.78rem; }
 .session-details dd { margin: 0; color: #f3f7ff; font-size: 0.78rem; font-weight: 650; text-align: right; }
 
+.integration-list { padding-top: 0; border-top: 0; }
+.integration-list dd { overflow-wrap: anywhere; }
+.integration-list .tone-ok { color: #65d7a6; }
+.integration-list .tone-error { color: var(--red-light); }
+.integration-list .tone-muted { color: #aebed2; }
+
+.integration-detail {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 138, 147, 0.25);
+    border-radius: 10px;
+    background: rgba(120, 30, 40, 0.18);
+    color: #ffc2c7;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
 .scenario-list { display: grid; gap: 10px; }
 
 .scenario-list button {

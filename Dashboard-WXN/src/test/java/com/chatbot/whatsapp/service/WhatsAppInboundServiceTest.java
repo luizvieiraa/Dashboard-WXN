@@ -45,6 +45,18 @@ class WhatsAppInboundServiceTest {
     }
 
     @Test
+    void deveIgnorarReacaoSemResponderAoCliente() {
+        WhatsAppInboundMessage reaction = new WhatsAppInboundMessage(
+                "wamid.REACAO", "5511988887777", "reaction", null, Instant.now(), "Maria");
+
+        WhatsAppInboundBatchResult result = service.handleAll(List.of(reaction));
+
+        assertThat(result.ignored()).isEqualTo(1);
+        verify(messageProcessingService, never()).processUnsupported(any(), any(), any());
+        verify(messageProcessingService, never()).process(any(), any());
+    }
+
+    @Test
     void deveTratarComoDuplicadaAEntregaSimultaneaDaMesmaMensagem() {
         // Primeira verificacao: ainda nao gravada. Depois da violacao do indice unico: ja gravada.
         when(messageService.alreadyProcessed("wamid.PARALELA")).thenReturn(false, true);

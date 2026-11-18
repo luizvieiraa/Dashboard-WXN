@@ -1,5 +1,6 @@
 package com.chatbot.whatsapp.integration.ai;
 
+import com.chatbot.whatsapp.integration.ProviderStatus;
 import java.util.Optional;
 
 /** Porta para um provedor externo de geracao de texto. */
@@ -20,5 +21,10 @@ public interface AiClient {
      */
     default Optional<AiTriageDecision> decide(AiTriageRequest request) {
         return Optional.empty();
+    }
+
+    /** Resultado da chamada mais recente ao provedor, para o painel de integracoes. */
+    default ProviderStatus.Snapshot status() {
+        return ProviderStatus.Snapshot.NONE;
     }
 }

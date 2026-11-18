@@ -1,5 +1,6 @@
 package com.chatbot.whatsapp.integration.ai;
 
+import com.chatbot.whatsapp.integration.ProviderStatus;
 import com.chatbot.whatsapp.util.LogSanitizer;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -19,6 +20,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Cliente HTTP para APIs compativeis com Responses ou Chat Completions (Gemini).
@@ -64,9 +66,12 @@ public class OpenAiResponsesClient implements AiClient {
             )
     );
 
+    private static final int MAX_FAILURE_CHARS = 200;
+
     private final AiProperties properties;
     private final RestClient restClient;
     private final AssistantResources resources;
+    private final ProviderStatus status = new ProviderStatus();
 
     @Autowired
     public OpenAiResponsesClient(AiProperties properties,
@@ -98,7 +103,8 @@ public class OpenAiResponsesClient implements AiClient {
         try {
             if (usesChatCompletions()) {
                 return chatCompletion(INSTRUCTIONS,
-                        "Contexto do cliente: " + customerContext + "\nMensagem: " + customerMessage, false);
+                        "Contexto do cliente: " + customerContext + "\nMensagem: " + customerMessage, false)
+                        .map(this::recordSuccess);
             }
             AiApiResponse response = restClient.post()
                     .uri(properties.apiUrl())
@@ -113,11 +119,16 @@ public class OpenAiResponsesClient implements AiClient {
                     .retrieve()
                     .body(AiApiResponse.class);
 
-            return extractText(response);
+            return extractText(response).map(this::recordSuccess);
         } catch (RestClientException | IllegalArgumentException ex) {
-            log.warn("Provedor de IA indisponivel; usando resposta deterministica ({})", LogSanitizer.describe(ex));
+            recordUnavailable(ex, "resposta deterministica");
             return Optional.empty();
         }
+    }
+
+    @Override
+    public ProviderStatus.Snapshot status() {
+        return status.snapshot();
     }
 
     @Override
@@ -141,7 +152,8 @@ public class OpenAiResponsesClient implements AiClient {
         try {
             if (usesChatCompletions()) {
                 return chatCompletion(resources.instructions(), userInput(request), true)
-                        .flatMap(this::parseDecision);
+                        .flatMap(this::parseDecision)
+                        .map(this::recordSuccess);
             }
             AiApiResponse response = restClient.post()
                     .uri(properties.apiUrl())
@@ -157,11 +169,46 @@ public class OpenAiResponsesClient implements AiClient {
                     .retrieve()
                     .body(AiApiResponse.class);
 
-            return extractText(response).flatMap(this::parseDecision);
+            return extractText(response).flatMap(this::parseDecision).map(this::recordSuccess);
         } catch (RestClientException | IllegalArgumentException | JsonProcessingException ex) {
-            log.warn("Provedor de IA indisponivel; usando o fluxo de triagem local ({})", LogSanitizer.describe(ex));
+            recordUnavailable(ex, "o fluxo de triagem local");
             return Optional.empty();
         }
+    }
+
+    private <T> T recordSuccess(T result) {
+        status.recordSuccess();
+        return result;
+    }
+
+    private void recordUnavailable(Exception ex, String fallback) {
+        String reason = describeFailure(ex);
+        status.recordFailure(reason);
+        log.warn("Provedor de IA indisponivel; usando {} ({})", fallback, reason);
+    }
+
+    /**
+     * Status HTTP e mensagem de erro do provedor (ex.: cota esgotada, modelo
+     * inexistente, faturamento exigido), sem o corpo bruto da resposta.
+     */
+    static String describeFailure(Exception ex) {
+        if (!(ex instanceof RestClientResponseException response)) {
+            return LogSanitizer.describe(ex);
+        }
+        String message = "";
+        try {
+            JsonNode body = MAPPER.readTree(response.getResponseBodyAsString());
+            // O Gemini devolve o erro dentro de uma lista; a OpenAI, como objeto.
+            JsonNode error = body.isArray() ? body.path(0).path("error") : body.path("error");
+            message = error.path("message").asText("")
+                    .replaceAll("\\d{8,}", "[omitido]")
+                    .replaceAll("\\s+", " ")
+                    .strip();
+        } catch (JsonProcessingException ignored) {
+            // Corpo vazio ou fora do formato JSON: fica so o status HTTP.
+        }
+        String summary = "HTTP " + response.getStatusCode().value() + (message.isEmpty() ? "" : ": " + message);
+        return summary.length() > MAX_FAILURE_CHARS ? summary.substring(0, MAX_FAILURE_CHARS - 1) + "…" : summary;
     }
 
     private boolean usesChatCompletions() {
@@ -188,16 +235,25 @@ public class OpenAiResponsesClient implements AiClient {
                 .retrieve()
                 .body(JsonNode.class);
         if (response == null) {
-            return Optional.empty();
+            return emptyReply("resposta vazia do provedor");
         }
         JsonNode choice = response.path("choices").path(0);
         // Nunca aproveita JSON parcial, recusas ou respostas bloqueadas pelo provedor.
-        if (!"stop".equals(choice.path("finish_reason").asText())) {
-            return Optional.empty();
+        String finishReason = choice.path("finish_reason").asText().replaceAll("[^A-Za-z_]", "");
+        if (!"stop".equals(finishReason)) {
+            return emptyReply("resposta incompleta do provedor (finish_reason="
+                    + (finishReason.isEmpty() ? "ausente" : finishReason) + ")"
+                    + ("length".equals(finishReason) ? "; aumente AI_MAX_OUTPUT_TOKENS" : ""));
         }
         JsonNode content = choice.path("message").path("content");
         return content.isTextual() && !content.asText().isBlank()
-                ? Optional.of(content.asText().strip()) : Optional.empty();
+                ? Optional.of(content.asText().strip()) : emptyReply("resposta sem texto do provedor");
+    }
+
+    private Optional<String> emptyReply(String reason) {
+        status.recordFailure(reason);
+        log.warn("IA nao respondeu: {}; usando o fluxo local", reason);
+        return Optional.empty();
     }
 
     /**
@@ -249,6 +305,7 @@ public class OpenAiResponsesClient implements AiClient {
     }
 
     private Optional<AiTriageDecision> invalidDecision() {
+        status.recordFailure("resposta da IA fora do formato esperado");
         log.warn("Resposta da IA fora do formato esperado; usando o fluxo de triagem local");
         return Optional.empty();
     }

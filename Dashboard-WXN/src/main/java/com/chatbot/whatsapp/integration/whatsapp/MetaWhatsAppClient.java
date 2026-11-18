@@ -1,5 +1,6 @@
 package com.chatbot.whatsapp.integration.whatsapp;
 
+import com.chatbot.whatsapp.integration.ProviderStatus;
 import com.chatbot.whatsapp.util.LogSanitizer;
 import com.chatbot.whatsapp.util.PhoneNumbers;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -75,6 +76,7 @@ public class MetaWhatsAppClient implements WhatsAppClient {
     private final WhatsAppProperties properties;
     private final RestClient restClient;
     private final Sleeper sleeper;
+    private final ProviderStatus status = new ProviderStatus();
 
     @Autowired
     public MetaWhatsAppClient(WhatsAppProperties properties, RestClient.Builder restClientBuilder) {
@@ -93,6 +95,21 @@ public class MetaWhatsAppClient implements WhatsAppClient {
 
     @Override
     public WhatsAppSendResult sendMessage(String phoneNumber, String text) {
+        WhatsAppSendResult result = send(phoneNumber, text);
+        if (result.sent()) {
+            status.recordSuccess();
+        } else {
+            status.recordFailure(result.error());
+        }
+        return result;
+    }
+
+    @Override
+    public ProviderStatus.Snapshot status() {
+        return status.snapshot();
+    }
+
+    private WhatsAppSendResult send(String phoneNumber, String text) {
         if (isBlank(properties.apiUrl())
                 || isBlank(properties.apiVersion())
                 || isBlank(properties.accessToken())
