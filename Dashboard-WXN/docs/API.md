@@ -45,7 +45,7 @@ recente a cada um desde que a aplicação iniciou. É o que alimenta o card
     "failing": true,
     "lastSuccessAt": "2026-11-17T19:40:02Z",
     "lastFailureAt": "2026-11-17T19:51:43Z",
-    "lastFailure": "HTTP 400, codigo 131030: Recipient phone number not in allowed list"
+    "lastFailure": "HTTP 400, codigo 131030: destinatario fora da lista de numeros de teste"
   },
   "assistant": {
     "enabled": true,
@@ -65,9 +65,11 @@ recente a cada um desde que a aplicação iniciou. É o que alimenta o card
 * `assistant.configured`: `AI_API_URL`, `AI_API_KEY` e `AI_MODEL` preenchidos.
 * `failing`: a chamada mais recente falhou. Para a IA, isso significa que a
   resposta enviada veio do fluxo local.
-* `lastFailure`: status HTTP e mensagem do provedor (ou o motivo local, como
-  `resposta incompleta do provedor (finish_reason=length)`), limitada a 200
-  caracteres e sem sequências longas de dígitos.
+* `lastFailure`: status HTTP, código do erro do provedor e uma explicação fixa,
+  como `HTTP 403 (PERMISSION_DENIED): acesso negado; ...`, ou o motivo local,
+  como `resposta incompleta do provedor (finish_reason=length)`. O texto livre do
+  provedor nunca é incluído: ele pode repetir parte da chave ou da mensagem
+  enviada. O código só é aceito com letras e sublinhado.
 
 Os valores ficam em memória: reiniciar a aplicação zera o estado.
 

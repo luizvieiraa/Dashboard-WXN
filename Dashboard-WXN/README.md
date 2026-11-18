@@ -611,22 +611,29 @@ O simulador (`/simulator`) tem o card **Integrações**, alimentado por
 `GET /api/v1/health/integrations` (ver [`docs/API.md`](docs/API.md)):
 
 * **Assistente virtual**: desligado, configuração incompleta, respondendo ou
-  falhando. Na falha, mostra o status HTTP e a mensagem do provedor.
+  falhando. Na falha, mostra o status HTTP, o código de erro do provedor e uma
+  explicação fixa. O texto livre do provedor nunca aparece, porque pode repetir
+  parte da chave ou da mensagem enviada.
 * **WhatsApp**: simulado ou Meta Cloud API, com o resultado do último envio
-  real.
-* **Última resposta** (no card da sessão): se a resposta veio do assistente
-  virtual, do fluxo local ou da equipe humana.
+  real (status HTTP, código da Meta e explicação fixa para os códigos
+  conhecidos).
+* **Última resposta** (no card da sessão): a origem da última mensagem enviada
+  ao cliente: assistente virtual, fluxo local, aviso automático de
+  encaminhamento ou equipe humana.
 
-O mesmo motivo aparece nos logs (`Provedor de IA indisponivel; ...` e
-`Falha ao enviar mensagem para ...`). Nenhuma credencial é exibida.
+O motivo da IA aparece igual no log (`Provedor de IA indisponivel; ...`). O log
+do envio pela Meta (`Falha ao enviar mensagem para ...`) traz também o texto do
+erro devolvido pela Meta, com sequências longas de dígitos mascaradas. Nenhuma
+credencial é exibida.
 
 Erros comuns:
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| IA: `HTTP 403: The Gemini API free tier is not available for this project` | O projeto da chave não tem a camada gratuita | Gere a chave em outro projeto no AI Studio ou ative o faturamento (gera cobrança) |
+| IA: `HTTP 403 (PERMISSION_DENIED)` | Chave de um projeto sem acesso ao modelo (ex.: sem a camada gratuita) | Gere a chave em outro projeto no AI Studio ou ative o faturamento (gera cobrança) |
 | IA: `HTTP 429` | Cota esgotada | Aguarde a renovação da cota ou mude de plano |
-| IA: `HTTP 404` ou `HTTP 400` citando o modelo | `AI_MODEL` inexistente para a chave | Confira o nome do modelo no AI Studio |
+| IA: `HTTP 404` | Modelo ou endpoint inexistente | Confira `AI_MODEL` e `AI_API_URL` |
+| IA: `HTTP 400` (ex.: `INVALID_ARGUMENT`, `FAILED_PRECONDITION`) | Requisição recusada: parâmetro, formato ou condição do projeto (como país sem camada gratuita) | Confira `AI_MODEL` e as condições do projeto no AI Studio |
 | IA: `finish_reason=length` | Limite de tokens atingido, comum em modelos com raciocínio | Aumente `AI_MAX_OUTPUT_TOKENS` |
 | IA: `HTTP 401` | Chave inválida | Confira `AI_API_KEY` |
 | WhatsApp: `codigo 190` | Token expirado (o temporário dura 24h) | Gere outro token ou use o permanente (13.5) |
@@ -700,8 +707,8 @@ Use um projeto na camada gratuita, sem ativar faturamento, se nao houver orcamen
 As cotas e a disponibilidade variam por conta; confira no AI Studio. Se houver erro,
 inclusive cota esgotada (HTTP 429), o chatbot usa o fluxo local, sem trocar de
 provedor ou modelo automaticamente. Nem todo projeto do Google tem a camada
-gratuita: se o card **Integrações** do simulador mostrar `HTTP 403 ... free tier
-is not available for this project`, gere a chave em outro projeto (seção 13.12). Limitar tokens nao impede cobrancas em uma
+gratuita: se o card **Integrações** do simulador mostrar
+`HTTP 403 (PERMISSION_DENIED)`, gere a chave em outro projeto (seção 13.12). Limitar tokens nao impede cobrancas em uma
 conta que tenha faturamento ativo. Na camada gratuita, o Google pode usar o conteudo
 para melhorar seus produtos: comece com dados ficticios, conforme as
 [condicoes do Gemini](https://aistudio.google.com/docs/pricing).

@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +73,19 @@ public class MetaWhatsAppClient implements WhatsAppClient {
     private static final int REENGAGEMENT_ERROR_CODE = 131047;
     /** Token de acesso expirado ou invalido. */
     private static final int EXPIRED_TOKEN_ERROR_CODE = 190;
+
+    /** Explicacoes fixas exibidas no painel; o texto livre da Meta fica so no log. */
+    private static final Map<Integer, String> KNOWN_ERRORS = Map.of(
+            100, "parametro invalido (ex.: WHATSAPP_PHONE_NUMBER_ID ou numero do destinatario)",
+            190, "token de acesso expirado ou invalido; confira WHATSAPP_ACCESS_TOKEN",
+            131026, "mensagem nao entregue ao destinatario",
+            131030, "destinatario fora da lista de numeros de teste",
+            131047, "janela de 24 horas encerrada",
+            133010, "numero comercial nao registrado na Cloud API",
+            130429, "limite de envio atingido",
+            131056, "limite de envio atingido",
+            80007, "limite de envio atingido",
+            4, "limite de envio atingido");
 
     private final WhatsAppProperties properties;
     private final RestClient restClient;
@@ -152,14 +166,14 @@ public class MetaWhatsAppClient implements WhatsAppClient {
                 boolean retryable = isRetryable(ex, error);
                 if (!retryable || attempt >= MAX_ATTEMPTS) {
                     logFailure(phoneNumber, ex, error, attempt);
-                    return WhatsAppSendResult.failed(error.summary());
+                    return WhatsAppSendResult.failed(error.publicSummary());
                 }
                 Duration wait = waitBeforeRetry(ex, backoff);
                 log.warn("Falha temporaria ao enviar mensagem para {} ({}); nova tentativa {}/{} em {} ms",
                         PhoneNumbers.mask(phoneNumber), error.summary(), attempt + 1, MAX_ATTEMPTS,
                         wait.toMillis());
                 if (!pause(wait)) {
-                    return WhatsAppSendResult.failed("Envio interrompido: " + error.summary());
+                    return WhatsAppSendResult.failed("Envio interrompido: " + error.publicSummary());
                 }
                 backoff = min(backoff.multipliedBy(2), MAX_BACKOFF);
             }
@@ -303,6 +317,16 @@ public class MetaWhatsAppClient implements WhatsAppClient {
                 summary.append(": ").append(title.length() > 160 ? title.substring(0, 160) : title);
             }
             return summary.toString();
+        }
+
+        /** Resumo para o resultado do envio e o painel: status, codigo e explicacao fixa. */
+        String publicSummary() {
+            if (httpStatus == null) {
+                return "falha de comunicacao com a Meta";
+            }
+            String summary = "HTTP " + httpStatus + (code == null ? "" : ", codigo " + code);
+            String meaning = code == null ? null : KNOWN_ERRORS.get(code);
+            return meaning == null ? summary : summary + ": " + meaning;
         }
     }
 

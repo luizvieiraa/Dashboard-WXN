@@ -87,8 +87,7 @@ class MetaWhatsAppClientTest {
         server.verify();
         assertThat(client.status().failing()).isTrue();
         assertThat(client.status().lastFailure())
-                .isEqualTo("HTTP 400, codigo 131030: Recipient phone number not in allowed list")
-                .doesNotContain("token-secreto");
+                .isEqualTo("HTTP 400, codigo 131030: destinatario fora da lista de numeros de teste");
     }
 
     @Test

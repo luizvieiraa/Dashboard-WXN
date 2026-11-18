@@ -73,7 +73,7 @@ class GeminiChatCompletionsTest {
     }
 
     @Test
-    void registraOMotivoInformadoPeloGeminiQuandoAChamadaEhRecusada() {
+    void registraStatusECodigoDoGeminiSemOTextoLivreDoErro() {
         server.expect(requestTo(URL)).andRespond(withStatus(org.springframework.http.HttpStatus.FORBIDDEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
@@ -85,9 +85,8 @@ class GeminiChatCompletionsTest {
 
         assertThat(client.status().failing()).isTrue();
         assertThat(client.status().lastFailure())
-                .startsWith("HTTP 403: The Gemini API free tier is not available")
-                .contains("[omitido]")
-                .doesNotContain("123456789012", "test-key");
+                .startsWith("HTTP 403 (PERMISSION_DENIED): acesso negado")
+                .doesNotContain("free tier", "123456789012", "test-key");
         server.verify();
     }
 
@@ -99,7 +98,7 @@ class GeminiChatCompletionsTest {
                 """, "stop"), MediaType.APPLICATION_JSON));
 
         client.decide(request());
-        assertThat(client.status().lastFailure()).isEqualTo("HTTP 429");
+        assertThat(client.status().lastFailure()).isEqualTo("HTTP 429: cota ou limite de requisicoes esgotado");
         assertThat(client.decide(request())).isPresent();
 
         assertThat(client.status().failing()).isFalse();

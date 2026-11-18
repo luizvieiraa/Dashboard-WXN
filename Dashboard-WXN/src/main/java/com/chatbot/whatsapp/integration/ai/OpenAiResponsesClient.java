@@ -66,7 +66,8 @@ public class OpenAiResponsesClient implements AiClient {
             )
     );
 
-    private static final int MAX_FAILURE_CHARS = 200;
+    private static final String NO_TEXT = "resposta sem texto do provedor";
+    private static final String ERROR_CODE_PATTERN = "[A-Za-z_]{1,40}";
 
     private final AiProperties properties;
     private final RestClient restClient;
@@ -188,27 +189,46 @@ public class OpenAiResponsesClient implements AiClient {
     }
 
     /**
-     * Status HTTP e mensagem de erro do provedor (ex.: cota esgotada, modelo
-     * inexistente, faturamento exigido), sem o corpo bruto da resposta.
+     * Status HTTP, codigo do erro e uma explicacao fixa. O texto livre do
+     * provedor nunca e usado: ele pode repetir parte da chave ou da mensagem enviada.
      */
     static String describeFailure(Exception ex) {
         if (!(ex instanceof RestClientResponseException response)) {
             return LogSanitizer.describe(ex);
         }
-        String message = "";
+        int status = response.getStatusCode().value();
+        String code = providerErrorCode(response.getResponseBodyAsString());
+        return "HTTP " + status + (code == null ? "" : " (" + code + ")") + ": " + explain(status);
+    }
+
+    /** Identificador do erro (ex.: PERMISSION_DENIED, insufficient_quota), aceito so com letras e sublinhado. */
+    private static String providerErrorCode(String body) {
         try {
-            JsonNode body = MAPPER.readTree(response.getResponseBodyAsString());
+            JsonNode root = MAPPER.readTree(body);
             // O Gemini devolve o erro dentro de uma lista; a OpenAI, como objeto.
-            JsonNode error = body.isArray() ? body.path(0).path("error") : body.path("error");
-            message = error.path("message").asText("")
-                    .replaceAll("\\d{8,}", "[omitido]")
-                    .replaceAll("\\s+", " ")
-                    .strip();
+            JsonNode error = root.isArray() ? root.path(0).path("error") : root.path("error");
+            for (String field : List.of("status", "code", "type")) {
+                String value = error.path(field).asText("");
+                if (value.matches(ERROR_CODE_PATTERN)) {
+                    return value;
+                }
+            }
         } catch (JsonProcessingException ignored) {
             // Corpo vazio ou fora do formato JSON: fica so o status HTTP.
         }
-        String summary = "HTTP " + response.getStatusCode().value() + (message.isEmpty() ? "" : ": " + message);
-        return summary.length() > MAX_FAILURE_CHARS ? summary.substring(0, MAX_FAILURE_CHARS - 1) + "…" : summary;
+        return null;
+    }
+
+    private static String explain(int status) {
+        return switch (status) {
+            case 400 -> "requisicao recusada pelo provedor; confira AI_MODEL e as condicoes do projeto";
+            case 401 -> "chave recusada; confira AI_API_KEY";
+            case 403 -> "acesso negado; a chave precisa ser de um projeto com acesso ao modelo "
+                    + "(camada gratuita ou faturamento)";
+            case 404 -> "modelo ou endpoint nao encontrado; confira AI_MODEL e AI_API_URL";
+            case 429 -> "cota ou limite de requisicoes esgotado";
+            default -> status >= 500 ? "instabilidade no provedor" : "falha no provedor";
+        };
     }
 
     private boolean usesChatCompletions() {
@@ -247,7 +267,7 @@ public class OpenAiResponsesClient implements AiClient {
         }
         JsonNode content = choice.path("message").path("content");
         return content.isTextual() && !content.asText().isBlank()
-                ? Optional.of(content.asText().strip()) : emptyReply("resposta sem texto do provedor");
+                ? Optional.of(content.asText().strip()) : emptyReply(NO_TEXT);
     }
 
     private Optional<String> emptyReply(String reason) {
@@ -325,16 +345,17 @@ public class OpenAiResponsesClient implements AiClient {
 
     private Optional<String> extractText(AiApiResponse response) {
         if (response == null || response.output() == null) {
-            return Optional.empty();
+            return emptyReply(NO_TEXT);
         }
-        return response.output().stream()
+        Optional<String> text = response.output().stream()
                 .filter(output -> output.content() != null)
                 .flatMap(output -> output.content().stream())
                 .filter(content -> "output_text".equals(content.type()))
                 .map(AiOutputContent::text)
-                .filter(text -> text != null && !text.isBlank())
+                .filter(value -> value != null && !value.isBlank())
                 .map(String::trim)
                 .findFirst();
+        return text.isPresent() ? text : emptyReply(NO_TEXT);
     }
 
     private int maxOutputTokens() {

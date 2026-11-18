@@ -20,7 +20,7 @@ class IntegrationStatusControllerTest {
     @Test
     void deveMostrarFalhaDaIaSemExporCredenciais() {
         ProviderStatus aiStatus = new ProviderStatus();
-        aiStatus.recordFailure("HTTP 403: The Gemini API free tier is not available for this project.");
+        aiStatus.recordFailure("HTTP 403 (PERMISSION_DENIED): acesso negado");
         AiProperties ai = new AiProperties(true, GEMINI_URL, "chave-secreta", "gemini-3.5-flash-lite", 20, 400);
 
         IntegrationStatusResponse response = controller(ai, aiStatus, whatsapp(false)).status();

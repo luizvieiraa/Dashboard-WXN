@@ -163,4 +163,22 @@ class OpenAiResponsesDecisionTest {
         assertThat(withoutKey.decide(request("Olá"))).isEmpty();
         localServer.verify();
     }
+
+    @Test
+    void respostaSemTextoNaoMantemOSucessoAnteriorNoPainel() throws Exception {
+        OpenAiResponsesClient client = client();
+        server.expect(requestTo(API_URL)).andRespond(withSuccess(outputText("""
+                {"intent":"GREETING","action":"RESOLVE","confidence":0.95,"sensitive":false,"reply":"Oi!"}
+                """), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(API_URL)).andRespond(withSuccess("""
+                {"output": [{"type": "reasoning", "summary": []}]}
+                """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.decide(request("Oi"))).isPresent();
+        assertThat(client.decide(request("Oi de novo"))).isEmpty();
+
+        server.verify();
+        assertThat(client.status().failing()).isTrue();
+        assertThat(client.status().lastFailure()).isEqualTo("resposta sem texto do provedor");
+    }
 }

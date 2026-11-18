@@ -15,8 +15,8 @@ public record IntegrationStatusResponse(WhatsApp whatsapp, Assistant assistant) 
             boolean failing,
             Instant lastSuccessAt,
             Instant lastFailureAt,
-            @Schema(description = "Motivo resumido da falha mais recente",
-                    example = "HTTP 400, codigo 131030: Recipient phone number not in allowed list")
+            @Schema(description = "Status HTTP, codigo da Meta e explicacao fixa; nunca o texto livre do provedor",
+                    example = "HTTP 400, codigo 131030: destinatario fora da lista de numeros de teste")
             String lastFailure
     ) {
     }
@@ -34,8 +34,8 @@ public record IntegrationStatusResponse(WhatsApp whatsapp, Assistant assistant) 
             boolean failing,
             Instant lastSuccessAt,
             Instant lastFailureAt,
-            @Schema(description = "Motivo resumido da falha mais recente",
-                    example = "HTTP 429: You exceeded your current quota")
+            @Schema(description = "Status HTTP, codigo do erro e explicacao fixa; nunca o texto livre do provedor",
+                    example = "HTTP 429 (RESOURCE_EXHAUSTED): cota ou limite de requisicoes esgotado")
             String lastFailure
     ) {
     }

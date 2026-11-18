@@ -5,8 +5,6 @@ const API = {
     integrations: "/api/v1/health/integrations"
 };
 
-const HUMAN_CONTEXTS = ["HUMAN_HANDOFF", "COMPLAINT_ESCALATED", "HUMAN_QUEUE_MESSAGE", "HUMAN_REPLY"];
-
 const statusLabels = {
     BOT_ACTIVE: "Bot ativo",
     COLLECTING_INFORMATION: "Coletando informações",
@@ -129,13 +127,19 @@ async function loadConversation(id) {
     updateStatus(conversation.status);
 }
 
-/** De onde veio a resposta mais recente, a partir do contexto gravado na conversa. */
+/** Origem da ultima mensagem enviada; a partir de assignedAt, quem responde e a equipe humana. */
 function replySourceLabel(conversation) {
-    const context = conversation.context;
-    if (!context || conversation.status === "CLOSED") return "—";
-    if (context.startsWith("AI_")) return "Assistente virtual (IA)";
-    if (HUMAN_CONTEXTS.includes(context)) return "Equipe humana";
-    return "Fluxo local";
+    const lastOutbound = (conversation.messages || []).filter(message => message.direction === "OUTBOUND").pop();
+    if (!lastOutbound) return "—";
+    if (conversation.assignedAt && new Date(lastOutbound.createdAt) >= new Date(conversation.assignedAt)) {
+        return "Equipe humana";
+    }
+    // O bot para ao encaminhar: a ultima mensagem dele e o aviso de encaminhamento.
+    if (conversation.status === "WAITING_HUMAN" || conversation.status === "HUMAN_ACTIVE") {
+        return "Aviso automático de encaminhamento";
+    }
+    if (conversation.status === "CLOSED") return "—";
+    return (conversation.context || "").startsWith("AI_") ? "Assistente virtual (IA)" : "Fluxo local";
 }
 
 async function loadIntegrations() {

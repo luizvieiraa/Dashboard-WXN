@@ -15,24 +15,24 @@ public final class ProviderStatus {
     private final AtomicReference<Snapshot> current = new AtomicReference<>(Snapshot.NONE);
 
     public void recordSuccess() {
-        current.updateAndGet(last -> new Snapshot(Instant.now(), last.lastFailureAt(), last.lastFailure()));
+        current.updateAndGet(last -> new Snapshot(Instant.now(), last.lastFailureAt(), last.lastFailure(), false));
     }
 
     public void recordFailure(String reason) {
-        current.updateAndGet(last -> new Snapshot(last.lastSuccessAt(), Instant.now(), reason));
+        current.updateAndGet(last -> new Snapshot(last.lastSuccessAt(), Instant.now(), reason, true));
     }
 
     public Snapshot snapshot() {
         return current.get();
     }
 
-    public record Snapshot(Instant lastSuccessAt, Instant lastFailureAt, String lastFailure) {
+    /**
+     * @param failing {@code true} quando a chamada mais recente falhou. Fica
+     *                gravado, e nao comparado pelos horarios, porque sucesso e
+     *                falha podem cair no mesmo instante do relogio.
+     */
+    public record Snapshot(Instant lastSuccessAt, Instant lastFailureAt, String lastFailure, boolean failing) {
 
-        public static final Snapshot NONE = new Snapshot(null, null, null);
-
-        /** {@code true} quando a chamada mais recente terminou em falha. */
-        public boolean failing() {
-            return lastFailureAt != null && (lastSuccessAt == null || lastFailureAt.isAfter(lastSuccessAt));
-        }
+        public static final Snapshot NONE = new Snapshot(null, null, null, false);
     }
 }
