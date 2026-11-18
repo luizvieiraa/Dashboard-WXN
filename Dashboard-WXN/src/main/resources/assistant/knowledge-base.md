@@ -34,6 +34,21 @@ Sugestão de seções (escreva o conteúdo abaixo deste comentário):
 ## Sobre a WXN
 A WXN é uma empresa que vende chatbots de inteligência artificial.
 Atende clientes de diferentes perfis e segmentos, sem um segmento exclusivo definido.
+A WXN Tecnologia é uma software house especializada em soluções SaaS
+integradas aos processos dos clientes, transformando necessidades em produtos
+escaláveis, com agilidade operacional e visão gerencial.
+
+## Visão e valores
+A visão da WXN para 2030 é ser uma software house de referência no Nordeste,
+com produtos consolidados e prontos para escala nacional.
+Valores da WXN: qualidade e confiabilidade; agilidade com responsabilidade;
+ética; sustentabilidade; e cliente no centro de tudo.
+
+## Benefícios do atendimento automatizado
+- Respostas rápidas e atendimento disponível 24 horas por dia.
+- Resolução automática de dúvidas recorrentes e simples.
+- Encaminhamento dos casos mais complexos para atendimento humano.
+- Atendimento que cresce sem precisar aumentar a equipe na mesma proporção.
 
 ## O que os chatbots fazem
 Os chatbots ajudam a resolver solicitações simples de atendimento, semelhantes
@@ -79,3 +94,15 @@ A conversa é encaminhada para atendimento humano.
 ### Quanto custa e quanto tempo leva para implantar?
 Os preços e os prazos ainda não estão definidos nesta base. A equipe da WXN
 precisa avaliar a necessidade e confirmar essas informações.
+
+### Quem é a WXN?
+A WXN Tecnologia é uma software house especializada em soluções SaaS,
+com o objetivo de ser referência no Nordeste.
+
+### Quais são os valores da WXN?
+Qualidade e confiabilidade, agilidade com responsabilidade, ética,
+sustentabilidade e cliente no centro de tudo.
+
+### Por que usar um chatbot no atendimento?
+Ele responde rápido a qualquer hora, resolve dúvidas simples e passa
+para uma pessoa da equipe o que não consegue resolver.
