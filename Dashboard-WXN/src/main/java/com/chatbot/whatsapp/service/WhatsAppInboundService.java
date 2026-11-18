@@ -78,6 +78,13 @@ public class WhatsAppInboundService {
             return false;
         }
 
+        if (message.isReaction()) {
+            // Responder a uma reacao com o aviso de "somente texto" interromperia a conversa.
+            log.debug("Reacao {} de {} ignorada", LogSanitizer.messageRef(message.messageId()),
+                    PhoneNumbers.mask(message.phone()));
+            return false;
+        }
+
         if (messageService.alreadyProcessed(message.messageId())) {
             log.info("Mensagem {} ja processada anteriormente; reentrega descartada",
                     LogSanitizer.messageRef(message.messageId()));

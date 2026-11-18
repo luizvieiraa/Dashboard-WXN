@@ -348,6 +348,7 @@ descrita abaixo** - nada disso pode ser feito por código.
 | `WhatsAppStatusService` | Aplica os status `sent`, `delivered`, `read` e `failed` às mensagens enviadas |
 | `CustomerServiceWindow` | Bloqueia respostas do atendente fora da janela de 24 horas |
 | `PhoneNumbers` | Normaliza telefones (formatos brasileiros) e monta o link `wa.me` |
+| `IntegrationStatusController` | `GET /api/v1/health/integrations`: estado da IA e do último envio pela Meta (seção 13.12) |
 
 O chatbot **não foi duplicado**: as mensagens do WhatsApp entram no mesmo
 `MessageProcessingService` que o simulador usa, então triagem, detecção de
@@ -386,6 +387,16 @@ desenvolvimento, use um túnel:
 # Em um terminal, com a aplicação rodando na porta 8080:
 ngrok http 8080
 # Anote a URL https gerada, ex.: https://abc123.ngrok-free.app
+
+# Alternativa: Cloudflare Tunnel, que também gera uma URL https temporária
+cloudflared tunnel --url http://localhost:8080
+```
+
+Antes de cadastrar na Meta, confirme que a URL pública chega ao backend (deve
+responder `ok`):
+
+```bash
+curl "https://SUA-URL-PUBLICA/api/v1/webhook/whatsapp/meta?hub.mode=subscribe&hub.verify_token=SEU_VERIFY_TOKEN&hub.challenge=ok"
 ```
 
 Em produção, use a URL pública do deploy (ver seção 15).
@@ -440,6 +451,19 @@ Essas credenciais devem ser guardadas como *secrets* da plataforma de
 deploy (ver seção 15) - **nunca** commitadas no repositório. Com
 `WHATSAPP_ENABLED=false` (padrão) o sistema roda inteiro sem nenhuma delas.
 
+O código não usa o **WABA ID** (id da WhatsApp Business Account): receber e
+responder mensagens usa só o Phone number ID. Ele aparece apenas na
+configuração: a Meta só entrega webhooks de uma WABA inscrita no app. A WABA do
+número de teste já vem inscrita; se um número de outra WABA não receber nada,
+inscreva-a uma vez com
+`POST https://graph.facebook.com/<versão>/<WABA_ID>/subscribed_apps`
+(header `Authorization: Bearer <token>`).
+
+Mensagens destinadas a outro número comercial (`metadata.phone_number_id`
+diferente de `WHATSAPP_PHONE_NUMBER_ID`) são ignoradas com aviso no log, para o
+bot não responder pelo número errado quando o app recebe eventos de mais de um
+número.
+
 Ao usar `WHATSAPP_ENABLED=true`, todas as configurações acima passam a
 ser obrigatórias. A aplicação falha ao iniciar se alguma estiver vazia, evitando
 subir um webhook que recebe mensagens mas não consegue responder ou validar a
@@ -458,8 +482,12 @@ falhas de envio ficam visíveis no histórico como `FAILED`.
    Mensagem enviada ao WhatsApp de 55... (id do provedor: wamid.YYY)
    ```
 
-3. Você deve receber a resposta do chatbot no WhatsApp - na primeira
-   mensagem, o início da triagem ("como posso te chamar?").
+3. Você deve receber a resposta do chatbot no WhatsApp. Com o assistente
+   virtual ativo (seção 14.1), ele responde à sua pergunta desde a primeira
+   mensagem; sem ele, começa a triagem guiada ("como posso te chamar?").
+   Se nada chegar, abra `GET /api/v1/health/integrations` ou o card
+   **Integrações** do simulador: o motivo da última falha aparece ali
+   (seção 13.12).
 4. Confirme a persistência abrindo o dashboard em
    `https://SUA-URL/dashboard`, ou via API:
    `curl https://SUA-URL/api/v1/conversations/1`.
@@ -484,10 +512,14 @@ falhas de envio ficam visíveis no histórico como `FAILED`.
   e são recusadas com `409` quando ela está encerrada (seção 13.9).
 * **Somente texto**: mídias (imagem, áudio, documento, localização) recebem
   um aviso pedindo que o cliente escreva em texto. O evento é registrado para
-  auditoria e deduplicação, mas não avança a coleta da triagem.
+  auditoria e deduplicação, mas não avança a coleta da triagem. Reações
+  (emoji em uma mensagem do bot) são ignoradas, sem resposta.
 * **Número de teste**: só conversa com os números cadastrados na lista de
   destinatários. Para atender qualquer pessoa é preciso registrar um número
-  próprio e passar pela verificação do negócio na Meta.
+  próprio e passar pela verificação do negócio na Meta. Seu número pessoal
+  pode ser o destinatário (o lado do cliente) sem nenhuma mudança. Para ser o
+  número do bot, a Meta exige excluir antes a conta de WhatsApp dele, que deixa
+  de funcionar no aplicativo; prefira um número dedicado.
 * **Processamento sincrônico**: o `200` para a Meta só volta depois de
   processar e enviar a resposta. Adequado ao volume atual; ver
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para a discussão.
@@ -573,6 +605,47 @@ original, que pode conter valores gravados. Os erros SQL brutos do Hibernate
 Para ver o texto das mensagens, use o simulador ou
 `GET /api/v1/conversations/{id}`.
 
+### 13.12. Diagnóstico das integrações
+
+O simulador (`/simulator`) tem o card **Integrações**, alimentado por
+`GET /api/v1/health/integrations` (ver [`docs/API.md`](docs/API.md)):
+
+* **Assistente virtual**: desligado, configuração incompleta, respondendo ou
+  falhando. Na falha, mostra o status HTTP, o código de erro do provedor e uma
+  explicação fixa. O texto livre do provedor nunca aparece, porque pode repetir
+  parte da chave ou da mensagem enviada.
+* **WhatsApp**: simulado ou Meta Cloud API, com o resultado do último envio
+  real (status HTTP, código da Meta e explicação fixa para os códigos
+  conhecidos).
+* **Última resposta** (no card da sessão): a origem da última mensagem enviada
+  ao cliente: assistente virtual, fluxo local, aviso automático de
+  encaminhamento ou equipe humana.
+
+O motivo da IA aparece igual no log (`Provedor de IA indisponivel; ...`). O log
+do envio pela Meta (`Falha ao enviar mensagem para ...`) traz também o texto do
+erro devolvido pela Meta, com sequências longas de dígitos mascaradas. Nenhuma
+credencial é exibida.
+
+Erros comuns:
+
+| Sintoma | Causa provável | O que fazer |
+|---|---|---|
+| IA: `HTTP 403 (PERMISSION_DENIED)` | Chave de um projeto sem acesso ao modelo (ex.: sem a camada gratuita) | Gere a chave em outro projeto no AI Studio ou ative o faturamento (gera cobrança) |
+| IA: `HTTP 429` | Cota esgotada | Aguarde a renovação da cota ou mude de plano |
+| IA: `HTTP 404` | Modelo ou endpoint inexistente | Confira `AI_MODEL` e `AI_API_URL` |
+| IA: `HTTP 400` (ex.: `INVALID_ARGUMENT`, `FAILED_PRECONDITION`) | Requisição recusada: parâmetro, formato ou condição do projeto (como país sem camada gratuita) | Confira `AI_MODEL` e as condições do projeto no AI Studio |
+| IA: `finish_reason=length` | Limite de tokens atingido, comum em modelos com raciocínio | Aumente `AI_MAX_OUTPUT_TOKENS` |
+| IA: `HTTP 401` | Chave inválida | Confira `AI_API_KEY` |
+| WhatsApp: `codigo 190` | Token expirado (o temporário dura 24h) | Gere outro token ou use o permanente (13.5) |
+| WhatsApp: `codigo 131030` | Destinatário fora da lista do número de teste | Cadastre o número em **API Setup > To** (13.2, passo 4) |
+| WhatsApp: `codigo 131047` | Janela de 24h encerrada | O cliente precisa enviar uma mensagem antes |
+| Meta não confirma o webhook (`403`) | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` diferente do painel | Use exatamente o mesmo valor nos dois lugares |
+| Webhook verificado, mas nenhuma mensagem chega | Campo `messages` não assinado | **Webhook fields > Manage > messages** (13.4) |
+| Aplicação não inicia com `WHATSAPP_ENABLED=true` | Variável obrigatória vazia | A mensagem de erro lista quais faltam (13.6) |
+| Log `Mensagem para outro numero comercial ignorada` | O cliente escreveu para um número diferente de `WHATSAPP_PHONE_NUMBER_ID` | Use o Phone number ID do número que o cliente está chamando; o log mostra os dois ids |
+| Número próprio não recebe nada, com webhook verificado e `messages` assinado | A WABA desse número não está inscrita no app | `POST /<versão>/<WABA_ID>/subscribed_apps` (13.6) |
+| `mvn` falha com `cannot find symbol ... builder()` | Maven rodando com JDK 23 ou mais novo, que não executa o Lombok por padrão | Aponte `JAVA_HOME` para um JDK 21 (`mvn -v` mostra qual está em uso) |
+
 ## 14. Variáveis de ambiente
 
 Todas documentadas em [`.env.example`](.env.example). Resumo:
@@ -633,7 +706,9 @@ AI_HISTORY_MESSAGES=6
 Use um projeto na camada gratuita, sem ativar faturamento, se nao houver orcamento.
 As cotas e a disponibilidade variam por conta; confira no AI Studio. Se houver erro,
 inclusive cota esgotada (HTTP 429), o chatbot usa o fluxo local, sem trocar de
-provedor ou modelo automaticamente. Limitar tokens nao impede cobrancas em uma
+provedor ou modelo automaticamente. Nem todo projeto do Google tem a camada
+gratuita: se o card **Integrações** do simulador mostrar
+`HTTP 403 (PERMISSION_DENIED)`, gere a chave em outro projeto (seção 13.12). Limitar tokens nao impede cobrancas em uma
 conta que tenha faturamento ativo. Na camada gratuita, o Google pode usar o conteudo
 para melhorar seus produtos: comece com dados ficticios, conforme as
 [condicoes do Gemini](https://aistudio.google.com/docs/pricing).

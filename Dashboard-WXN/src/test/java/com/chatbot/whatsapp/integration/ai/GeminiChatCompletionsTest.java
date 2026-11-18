@@ -67,6 +67,42 @@ class GeminiChatCompletionsTest {
                 {"intent":"SUPPORT","action":"RESOLVE","confidence":0.9,"sensitive":false,"reply":"Oi"}
                 """, "length"), MediaType.APPLICATION_JSON));
         assertThat(client.decide(request())).isEmpty();
+        assertThat(client.status().failing()).isTrue();
+        assertThat(client.status().lastFailure()).contains("finish_reason=length", "AI_MAX_OUTPUT_TOKENS");
+        server.verify();
+    }
+
+    @Test
+    void registraStatusECodigoDoGeminiSemOTextoLivreDoErro() {
+        server.expect(requestTo(URL)).andRespond(withStatus(org.springframework.http.HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        [{"error": {"code": 403, "status": "PERMISSION_DENIED",
+                          "message": "The Gemini API free tier is not available for this project 123456789012."}}]
+                        """));
+
+        assertThat(client.decide(request())).isEmpty();
+
+        assertThat(client.status().failing()).isTrue();
+        assertThat(client.status().lastFailure())
+                .startsWith("HTTP 403 (PERMISSION_DENIED): acesso negado")
+                .doesNotContain("free tier", "123456789012", "test-key");
+        server.verify();
+    }
+
+    @Test
+    void sucessoDepoisDeUmaFalhaLimpaOEstadoDeErro() throws Exception {
+        server.expect(requestTo(URL)).andRespond(withStatus(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS));
+        server.expect(requestTo(URL)).andRespond(withSuccess(response("""
+                {"intent":"GREETING","action":"RESOLVE","confidence":0.95,"sensitive":false,"reply":"Oi!"}
+                """, "stop"), MediaType.APPLICATION_JSON));
+
+        client.decide(request());
+        assertThat(client.status().lastFailure()).isEqualTo("HTTP 429: cota ou limite de requisicoes esgotado");
+        assertThat(client.decide(request())).isPresent();
+
+        assertThat(client.status().failing()).isFalse();
+        assertThat(client.status().lastSuccessAt()).isNotNull();
         server.verify();
     }
 

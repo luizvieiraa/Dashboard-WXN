@@ -29,6 +29,52 @@ Também está disponível o health check padrão do Spring Boot Actuator em
 
 ---
 
+## `GET /api/v1/health/integrations`
+
+Mostra se a IA e o WhatsApp estão ligados e como terminou a chamada mais
+recente a cada um desde que a aplicação iniciou. É o que alimenta o card
+**Integrações** do simulador. Nunca devolve tokens nem chaves.
+
+* **Parâmetros**: nenhum.
+* **Resposta `200 OK`**:
+
+```json
+{
+  "whatsapp": {
+    "mode": "META_CLOUD_API",
+    "failing": true,
+    "lastSuccessAt": "2026-11-17T19:40:02Z",
+    "lastFailureAt": "2026-11-17T19:51:43Z",
+    "lastFailure": "HTTP 400, codigo 131030: destinatario fora da lista de numeros de teste"
+  },
+  "assistant": {
+    "enabled": true,
+    "configured": true,
+    "host": "generativelanguage.googleapis.com",
+    "model": "gemini-3.5-flash-lite",
+    "failing": false,
+    "lastSuccessAt": "2026-11-17T19:51:40Z",
+    "lastFailureAt": null,
+    "lastFailure": null
+  }
+}
+```
+
+* `whatsapp.mode`: `META_CLOUD_API` com `WHATSAPP_ENABLED=true`; `SIMULADO`
+  caso contrário. No modo simulado nenhum envio é registrado.
+* `assistant.configured`: `AI_API_URL`, `AI_API_KEY` e `AI_MODEL` preenchidos.
+* `failing`: a chamada mais recente falhou. Para a IA, isso significa que a
+  resposta enviada veio do fluxo local.
+* `lastFailure`: status HTTP, código do erro do provedor e uma explicação fixa,
+  como `HTTP 403 (PERMISSION_DENIED): acesso negado; ...`, ou o motivo local,
+  como `resposta incompleta do provedor (finish_reason=length)`. O texto livre do
+  provedor nunca é incluído: ele pode repetir parte da chave ou da mensagem
+  enviada. O código só é aceito com letras e sublinhado.
+
+Os valores ficam em memória: reiniciar a aplicação zera o estado.
+
+---
+
 ## `POST /api/v1/webhook/whatsapp`
 
 Recebe uma mensagem do cliente em um formato simplificado. É o endpoint
@@ -191,6 +237,11 @@ conectado.
     o evento é registrado no histórico como `[Mensagem do WhatsApp do tipo: ...]`
     (para auditoria e deduplicação), sem avançar a triagem; se a conversa
     estiver com a equipe humana, o aviso automático não é enviado;
+  * a mensagem é uma **reação** (emoji em uma mensagem já enviada) - é
+    ignorada, sem resposta automática e sem registro no histórico;
+  * a mensagem foi enviada a **outro número comercial**
+    (`metadata.phone_number_id` diferente de `WHATSAPP_PHONE_NUMBER_ID`,
+    quando este está configurado) - ignorada, com aviso no log;
   * a mensagem é uma **reentrega** de algo já processado (deduplicação por
     `messages[].id`, guardado em `messages.external_id`);
   * o payload é **inválido ou irreconhecível** - registrado em log.

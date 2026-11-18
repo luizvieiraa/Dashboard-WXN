@@ -14,10 +14,45 @@ import org.junit.jupiter.api.Test;
 class MetaWebhookPayloadParserTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final MetaWebhookPayloadParser parser = new MetaWebhookPayloadParser();
+    private final MetaWebhookPayloadParser parser = parserFor("");
+
+    private static MetaWebhookPayloadParser parserFor(String phoneNumberId) {
+        return new MetaWebhookPayloadParser(new WhatsAppProperties(
+                true, "https://graph.facebook.com", "v21.0", "token", phoneNumberId,
+                "15550783881", "verify-token", "app-secret"));
+    }
 
     private List<WhatsAppInboundMessage> parse(String json) throws Exception {
         return parser.parse(objectMapper.readValue(json, MetaWebhookPayload.class));
+    }
+
+    private static String textTo(String phoneNumberId) {
+        return """
+                {
+                  "object": "whatsapp_business_account",
+                  "entry": [{ "id": "102290129340398", "changes": [{ "field": "messages", "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": { "display_phone_number": "15550783881", "phone_number_id": "%s" },
+                    "messages": [{ "from": "5511988887777", "id": "wamid.NUMERO", "timestamp": "1749416383",
+                                   "type": "text", "text": { "body": "Oi" } }]
+                  }}]}]
+                }
+                """.formatted(phoneNumberId);
+    }
+
+    @Test
+    void deveAceitarMensagemParaONumeroConfigurado() throws Exception {
+        MetaWebhookPayload payload = objectMapper.readValue(textTo("106540352242922"), MetaWebhookPayload.class);
+
+        assertThat(parserFor("106540352242922").parse(payload)).hasSize(1);
+    }
+
+    @Test
+    void deveIgnorarMensagemParaOutroNumeroComercial() throws Exception {
+        // Ex.: numero de teste e numero proprio assinados pelo mesmo app.
+        MetaWebhookPayload payload = objectMapper.readValue(textTo("999999999999999"), MetaWebhookPayload.class);
+
+        assertThat(parserFor("106540352242922").parse(payload)).isEmpty();
     }
 
     @Test

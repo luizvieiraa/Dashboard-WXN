@@ -1,5 +1,7 @@
 package com.chatbot.whatsapp.integration.whatsapp;
 
+import com.chatbot.whatsapp.integration.ProviderStatus;
+
 /**
  * Abstracao para o envio de mensagens de volta ao cliente via WhatsApp.
  *
@@ -17,4 +19,9 @@ public interface WhatsAppClient {
      * @return resultado confirmado pelo provedor, incluindo o id externo
      */
     WhatsAppSendResult sendMessage(String phoneNumber, String text);
+
+    /** Resultado do envio mais recente ao provedor; o envio simulado nao registra nada. */
+    default ProviderStatus.Snapshot status() {
+        return ProviderStatus.Snapshot.NONE;
+    }
 }
