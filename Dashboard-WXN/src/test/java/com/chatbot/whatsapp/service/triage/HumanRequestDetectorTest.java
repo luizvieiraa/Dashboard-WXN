@@ -20,7 +20,12 @@ class HumanRequestDetectorTest {
             "Chama uma pessoa real, por favor",
             "Quero uma pessoa de verdade",
             "Não quero falar com robô",
-            "FALAR COM O OPERADOR"
+            "FALAR COM O OPERADOR",
+            "Quero falar com um representante",
+            "Posso falar com o vendedor?",
+            "Preciso falar com o responsável",
+            "Quero ser atendido por uma pessoa",
+            "Prefiro ser atendida por um humano"
     })
     void deveDetectarPedidoDeAtendimentoHumano(String message) {
         assertThat(detector.isHumanRequest(message)).isTrue();
@@ -33,7 +38,9 @@ class HumanRequestDetectorTest {
             "Quero saber o preço para uma pessoa física",
             "Sou atendente de uma loja e quero automatizar o WhatsApp",
             "Olá, bom dia",
-            "Quero contratar um chatbot"
+            "Quero contratar um chatbot",
+            "Sou o responsável pela empresa",
+            "Quero vender mais pelo WhatsApp"
     })
     void naoDeveConfundirRespostasDaTriagemComPedidoDeAtendente(String message) {
         assertThat(detector.isHumanRequest(message)).isFalse();

@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class HumanRequestDetector {
 
-    private static final String HUMAN = "(?:atendente|humano|humana|pessoa|alguem|operador|operadora|especialista)";
+    private static final String HUMAN = "(?:atendente|humano|humana|pessoa|alguem|operador|operadora|especialista|"
+            + "representante|vendedor|vendedora|responsavel)";
     private static final String ARTICLE = "(?:(?:um|uma|algum|alguma|o|a) )?";
 
     private static final List<Pattern> HUMAN_REQUEST_PATTERNS = List.of(
@@ -28,6 +29,7 @@ public class HumanRequestDetector {
                     + "transferir|transfira|me transfira)(?: (?:para|pra))? " + ARTICLE
                     + "(?:atendente|humano|humana|pessoa real|operador|operadora)"),
             pattern("(?:pessoa|atendente|humano) de verdade"),
+            pattern("ser atendid[oa] por " + ARTICLE + "(?:pessoa|humano|humana|atendente)"),
             pattern("nao (?:quero|gosto de) (?:falar com )?(?:um )?(?:robo|bot|maquina)")
     );
 
